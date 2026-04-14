@@ -3,13 +3,13 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
+import { getViewUser } from "@/lib/partner-view";
 
 export async function getSpendingInsights() {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
-  const userId = session.user.id;
-  const userCurrency = session.user.currency || "USD";
+  const { id: userId, currency: userCurrency } = await getViewUser();
   const rates = await getExchangeRates(userCurrency);
   const toUser = (amount: number, from: string) => convertCurrency(amount, from, userCurrency, rates);
 

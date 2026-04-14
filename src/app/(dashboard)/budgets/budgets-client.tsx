@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Target, Trash2, AlertTriangle, Bell } from "lucide-react";
+import { usePartnerView } from "@/hooks/use-partner-view";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { getBudgets, createBudget, deleteBudget } from "@/actions/budgets";
 import { getCategories } from "@/actions/categories";
@@ -44,6 +45,7 @@ interface Category {
 
 export function BudgetsClient() {
   const { data: session } = useSession();
+  const { isPartnerView } = usePartnerView();
   const formatCurrency = currencyFormatter(session?.user?.currency);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -113,7 +115,7 @@ export function BudgetsClient() {
           <h1 className="text-2xl font-bold text-foreground">Budgets</h1>
           <p className="text-muted-foreground">Set spending limits per category</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        {!isPartnerView && <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger render={<Button />}>
             <Plus className="w-4 h-4 mr-2" />
             Add Budget
@@ -175,7 +177,7 @@ export function BudgetsClient() {
               </Button>
             </form>
           </DialogContent>
-        </Dialog>
+        </Dialog>}
       </div>
 
       {/* Alert Banner */}
@@ -270,14 +272,14 @@ export function BudgetsClient() {
                       {budget.period}
                     </Badge>
                   </div>
-                  <Button
+                  {!isPartnerView && <Button
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500"
                     onClick={() => handleDelete(budget.id)}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+                  </Button>}
                 </div>
 
                 <div className="flex items-baseline justify-between mb-2">

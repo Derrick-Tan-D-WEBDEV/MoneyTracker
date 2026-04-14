@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2, Repeat, ExternalLink, CreditCard } from "lucide-react";
+import { usePartnerView } from "@/hooks/use-partner-view";
 import { getSubscriptions, createSubscription, toggleSubscription, deleteSubscription } from "@/actions/subscriptions";
 import { getCategories } from "@/actions/categories";
 import { currencyFormatter } from "@/lib/format";
@@ -36,6 +37,7 @@ const FREQ_LABELS: Record<string, string> = { DAILY: "Daily", WEEKLY: "Weekly", 
 
 export function SubscriptionsClient() {
   const { data: session } = useSession();
+  const { isPartnerView } = usePartnerView();
   const userCurrency = session?.user?.currency || "USD";
   const formatCurrency = currencyFormatter(userCurrency);
 
@@ -144,7 +146,7 @@ export function SubscriptionsClient() {
           <h1 className="text-2xl font-bold text-foreground">Subscriptions</h1>
           <p className="text-muted-foreground">Track your recurring subscriptions and services</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        {!isPartnerView && <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger render={<Button />}>
             <Plus className="w-4 h-4 mr-2" /> Add Subscription
           </DialogTrigger>
@@ -226,7 +228,7 @@ export function SubscriptionsClient() {
               </Button>
             </form>
           </DialogContent>
-        </Dialog>
+        </Dialog>}
       </div>
 
       {/* Summary */}
@@ -293,14 +295,15 @@ export function SubscriptionsClient() {
                     </div>
                   </div>
                   <p className="text-sm font-bold tabular-nums">{currencyFormatter(sub.currency)(sub.amount)}</p>
-                  <Switch checked={sub.isActive} onCheckedChange={() => handleToggle(sub.id)} />
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(sub.id)}>
+                  {!isPartnerView && <Switch checked={sub.isActive} onCheckedChange={() => handleToggle(sub.id)} />}
+                  {!isPartnerView && <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(sub.id)}>
                     <Trash2 className="w-4 h-4" />
-                  </Button>
+                  </Button>}
                 </div>
               ))}
             </div>
           )}
+
         </CardContent>
       </Card>
 
@@ -324,10 +327,10 @@ export function SubscriptionsClient() {
                     </Badge>
                   </div>
                   <p className="text-sm font-bold tabular-nums">{currencyFormatter(sub.currency)(sub.amount)}</p>
-                  <Switch checked={sub.isActive} onCheckedChange={() => handleToggle(sub.id)} />
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(sub.id)}>
+                  {!isPartnerView && <Switch checked={sub.isActive} onCheckedChange={() => handleToggle(sub.id)} />}
+                  {!isPartnerView && <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(sub.id)}>
                     <Trash2 className="w-4 h-4" />
-                  </Button>
+                  </Button>}
                 </div>
               ))}
             </div>

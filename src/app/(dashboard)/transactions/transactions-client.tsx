@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, ArrowUpRight, ArrowDownRight, ArrowRightLeft, Trash2, Pencil, Filter, Search, Download, Upload, X, Tag } from "lucide-react";
+import { usePartnerView } from "@/hooks/use-partner-view";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { CSVImportDialog } from "@/components/csv-import-dialog";
 import { getTransactions, createTransaction, deleteTransaction, checkTransactionAchievements } from "@/actions/transactions";
@@ -54,6 +55,7 @@ interface Category {
 
 export function TransactionsClient() {
   const { data: session } = useSession();
+  const { isPartnerView } = usePartnerView();
   const userCurrency = session?.user?.currency || "MYR";
   const formatCurrency = currencyFormatter(userCurrency);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -247,7 +249,7 @@ export function TransactionsClient() {
           <h1 className="text-2xl font-bold text-foreground">Transactions</h1>
           <p className="text-muted-foreground">Manage your income and expenses</p>
         </div>
-        <div className="flex items-center gap-2">
+        {!isPartnerView && <div className="flex items-center gap-2">
           <Popover open={tagDialogOpen} onOpenChange={setTagDialogOpen}>
             <PopoverTrigger render={<Button variant="outline" />}>
               <Tag className="w-4 h-4 mr-2" />
@@ -430,7 +432,7 @@ export function TransactionsClient() {
               </form>
             </DialogContent>
           </Dialog>
-        </div>
+        </div>}
         <CSVImportDialog open={importOpen} onOpenChange={setImportOpen} accounts={accounts} onImported={fetchData} />
       </div>
 
@@ -645,9 +647,9 @@ export function TransactionsClient() {
                             )}
                           </PopoverContent>
                         </Popover>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(t.id)}>
+                        {!isPartnerView && <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(t.id)}>
                           <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                        </Button>}
                       </div>
                     </TableCell>
                   </TableRow>

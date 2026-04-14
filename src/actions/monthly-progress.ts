@@ -3,6 +3,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
+import { getViewUser } from "@/lib/partner-view";
 
 export interface MonthlyProgress {
   // Debts
@@ -30,17 +31,15 @@ export interface MonthlyProgress {
 }
 
 export async function getMonthlyProgress(): Promise<MonthlyProgress> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const { id: userId, currency: userCurrency } = await getViewUser();
 
-  const userCurrency = session.user.currency || "USD";
   const rates = await getExchangeRates(userCurrency);
   const now = new Date();
   const monthLabel = now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   // Debts
   const debts = await db.debt.findMany({
-    where: { userId: session.user.id, isPaidOff: false },
+    where: { userId, isPaidOff: false },
   });
 
   const totalDebtRemaining = debts.reduce((s, d) => s + convertCurrency(Number(d.remainingAmount), d.currency, userCurrency, rates), 0);
@@ -50,7 +49,7 @@ export async function getMonthlyProgress(): Promise<MonthlyProgress> {
 
   // Installments
   const installments = await db.installment.findMany({
-    where: { userId: session.user.id, isCompleted: false },
+    where: { userId, isCompleted: false },
     include: { account: true },
   });
 
@@ -60,7 +59,7 @@ export async function getMonthlyProgress(): Promise<MonthlyProgress> {
 
   // Goals
   const goals = await db.goal.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
   });
 
   const activeGoals = goals.filter((g) => Number(g.currentAmount) < Number(g.targetAmount));
@@ -71,7 +70,7 @@ export async function getMonthlyProgress(): Promise<MonthlyProgress> {
 
   // Savings accounts
   const savingsAccounts = await db.financialAccount.findMany({
-    where: { userId: session.user.id, type: "SAVINGS" },
+    where: { userId, type: "SAVINGS" },
   });
 
   const totalSavingsBalance = savingsAccounts.reduce((s, a) => s + convertCurrency(Number(a.balance), a.currency, userCurrency, rates), 0);

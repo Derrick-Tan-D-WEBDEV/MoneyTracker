@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { getViewUserId } from "@/lib/partner-view";
 
 const transactionSchema = z.object({
   accountId: z.string().uuid(),
@@ -17,10 +18,9 @@ const transactionSchema = z.object({
 });
 
 export async function getTransactions(filters?: { type?: string; accountId?: string; categoryId?: string; startDate?: string; endDate?: string }) {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await getViewUserId();
 
-  const where: Record<string, unknown> = { userId: session.user.id, isRecurring: false, isAdjustment: false };
+  const where: Record<string, unknown> = { userId, isRecurring: false, isAdjustment: false };
 
   if (filters?.type && filters.type !== "ALL") {
     where.type = filters.type;

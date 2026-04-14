@@ -3,6 +3,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
+import { getViewUserId } from "@/lib/partner-view";
 
 export interface CalendarEvent {
   id: string;
@@ -18,7 +19,7 @@ export async function getBillCalendarData(month?: number, year?: number) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
-  const userId = session.user.id;
+  const userId = await getViewUserId();
   const now = new Date();
   const targetMonth = month ?? now.getMonth();
   const targetYear = year ?? now.getFullYear();

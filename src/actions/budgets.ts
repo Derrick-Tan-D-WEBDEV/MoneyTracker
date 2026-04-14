@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
+import { getViewUser } from "@/lib/partner-view";
 
 const budgetSchema = z.object({
   categoryId: z.string().uuid(),
@@ -20,17 +21,15 @@ const budgetSchema = z.object({
 });
 
 export async function getBudgets() {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const { id: userId, currency: userCurrency } = await getViewUser();
 
-  const userCurrency = session.user.currency || "MYR";
   const rates = await getExchangeRates(userCurrency);
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
   const budgets = await db.budget.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
     include: { category: true },
     orderBy: { createdAt: "desc" },
   });
@@ -39,7 +38,7 @@ export async function getBudgets() {
     budgets.map(async (budget) => {
       const transactions = await db.transaction.findMany({
         where: {
-          userId: session.user.id,
+          userId,
           categoryId: budget.categoryId,
           type: "EXPENSE",
           date: { gte: startOfMonth, lte: now },

@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Repeat, ArrowUpRight, ArrowDownRight, Trash2, CalendarClock, Play, Pause, Zap } from "lucide-react";
+import { usePartnerView } from "@/hooks/use-partner-view";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { getRecurringRules, createRecurringRule, toggleRecurringRule, deleteRecurringRule, processRecurringTransactions } from "@/actions/recurring";
 import { getAccounts } from "@/actions/accounts";
@@ -67,6 +68,7 @@ const FREQUENCY_BADGE_COLOR: Record<string, string> = {
 
 export function RecurringClient() {
   const { data: session } = useSession();
+  const { isPartnerView } = usePartnerView();
   const userCurrency = session?.user?.currency || "MYR";
   const formatCurrency = currencyFormatter(userCurrency);
   const [rules, setRules] = useState<RecurringRule[]>([]);
@@ -231,13 +233,13 @@ export function RecurringClient() {
           <p className="text-muted-foreground text-sm">Automate your regular income and expenses</p>
         </div>
         <div className="flex gap-2">
-          {dueCount > 0 && (
+          {!isPartnerView && dueCount > 0 && (
             <Button variant="outline" onClick={handleProcessNow} disabled={processing}>
               <Zap className="w-4 h-4 mr-2" />
               Process Due ({dueCount})
             </Button>
           )}
-          <Dialog
+          {!isPartnerView && <Dialog
             open={dialogOpen}
             onOpenChange={(open) => {
               setDialogOpen(open);
@@ -367,7 +369,7 @@ export function RecurringClient() {
                 </Button>
               </form>
             </DialogContent>
-          </Dialog>
+          </Dialog>}
         </div>
       </div>
 
@@ -482,12 +484,12 @@ export function RecurringClient() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    {!isPartnerView && <div className="flex items-center gap-2 shrink-0">
                       <Switch checked={rule.isActive} onCheckedChange={(checked) => handleToggle(rule.id, checked)} />
                       <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(rule.id)}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
-                    </div>
+                    </div>}
                   </div>
                 </CardContent>
               </Card>

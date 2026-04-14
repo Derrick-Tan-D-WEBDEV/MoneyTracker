@@ -3,12 +3,11 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
+import { getViewUser } from "@/lib/partner-view";
 
 export async function getReportData(year?: number) {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const { id: userId, currency: userCurrency } = await getViewUser();
 
-  const userCurrency = session.user.currency || "MYR";
   const rates = await getExchangeRates(userCurrency);
   const toUser = (amount: number, from: string) => convertCurrency(amount, from, userCurrency, rates);
 
@@ -18,7 +17,7 @@ export async function getReportData(year?: number) {
 
   const transactions = await db.transaction.findMany({
     where: {
-      userId: session.user.id,
+      userId,
       isRecurring: false,
       isAdjustment: false,
       date: { gte: startOfYear, lt: endOfYear },

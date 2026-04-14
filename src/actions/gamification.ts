@@ -5,20 +5,20 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { ACHIEVEMENTS, getAchievement, calculateLevel, calculateTransactionXp, XP_INVESTMENT, XP_GOAL_CONTRIBUTION } from "@/lib/achievements";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
+import { getViewUserId } from "@/lib/partner-view";
 
 export async function getUserStats() {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await getViewUserId();
 
   const user = await db.user.findUnique({
-    where: { id: session.user.id },
+    where: { id: userId },
     select: { xp: true, level: true, streak: true, lastActiveDate: true },
   });
 
   if (!user) throw new Error("User not found");
 
   const achievements = await db.achievement.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
     orderBy: { unlockedAt: "desc" },
   });
 
@@ -269,10 +269,18 @@ async function checkBalanceAchievements(userId: string, results: string[]) {
 
   const accounts = await db.financialAccount.findMany({
     where: { userId, isArchived: false },
-    select: { balance: true, currency: true },
+    select: { balance: true, currency: true, type: true, creditLimit: true },
   });
   // Convert all balances to USD for consistent achievement thresholds
-  const totalBalanceUSD = accounts.reduce((sum, a) => sum + convertCurrency(Number(a.balance), a.currency, "USD", rates), 0);
+  const totalBalanceUSD = accounts.reduce((sum, a) => {
+    const converted = convertCurrency(Number(a.balance), a.currency, "USD", rates);
+    if (a.type === "CREDIT_CARD") {
+      // Balance = available credit; liability = creditLimit - balance
+      const limit = a.creditLimit ? convertCurrency(Number(a.creditLimit), a.currency, "USD", rates) : 0;
+      return sum - (limit - converted);
+    }
+    return sum + converted;
+  }, 0);
 
   if (totalBalanceUSD >= 1000) results.push(...(await tryUnlock(userId, "SAVINGS_1K")));
   if (totalBalanceUSD >= 10000) results.push(...(await tryUnlock(userId, "SAVINGS_10K")));

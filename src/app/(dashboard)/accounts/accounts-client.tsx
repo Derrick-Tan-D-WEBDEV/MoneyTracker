@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Wallet, CreditCard, Landmark, PiggyBank, Banknote, TrendingUp, Bitcoin, Pencil, ArrowRightLeft } from "lucide-react";
+import { usePartnerView } from "@/hooks/use-partner-view";
 import { getAccounts, createAccount, updateAccount } from "@/actions/accounts";
 import { getExchangeRates } from "@/actions/exchange-rates";
 import { convertCurrency, type RateMap } from "@/lib/exchange-rates";
@@ -49,6 +50,7 @@ function getAccountIcon(type: string) {
 
 export function AccountsClient() {
   const { data: session } = useSession();
+  const { isPartnerView } = usePartnerView();
   const userCurrency = session?.user?.currency || "MYR";
   const formatUserCurrency = currencyFormatter(userCurrency);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -151,12 +153,15 @@ export function AccountsClient() {
   };
 
   const totalBalance = accounts.reduce((s, a) => {
-    if (a.currency === userCurrency) return s + a.balance;
-    // Convert from account currency to user currency
-    // rates is based on userCurrency, so we need the inverse
-    const rate = rates[a.currency];
-    if (rate) return s + a.balance / rate;
-    return s + a.balance;
+    const converted = a.currency === userCurrency
+      ? a.balance
+      : (rates[a.currency] ? a.balance / rates[a.currency] : a.balance);
+    if (a.type === "CREDIT_CARD") {
+      // Balance = available credit; liability = creditLimit - balance (used)
+      const limit = a.creditLimit != null ? (a.currency === userCurrency ? a.creditLimit : (rates[a.currency] ? a.creditLimit / rates[a.currency] : a.creditLimit)) : 0;
+      return s - (limit - converted);
+    }
+    return s + converted;
   }, 0);
 
   const hasMultipleCurrencies = new Set(accounts.map((a) => a.currency)).size > 1;
@@ -168,7 +173,7 @@ export function AccountsClient() {
           <h1 className="text-2xl font-bold text-foreground">Accounts</h1>
           <p className="text-muted-foreground">Manage your financial accounts</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        {!isPartnerView && <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger render={<Button />}>
             <Plus className="w-4 h-4 mr-2" />
             Add Account
@@ -253,7 +258,7 @@ export function AccountsClient() {
               </Button>
             </form>
           </DialogContent>
-        </Dialog>
+        </Dialog>}
       </div>
 
       {/* Total balance */}
@@ -302,14 +307,14 @@ export function AccountsClient() {
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: account.color + "20" }}>
                       <Icon className="w-5 h-5" style={{ color: account.color }} />
                     </div>
-                    <Button
+                    {!isPartnerView && <Button
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary"
                       onClick={() => handleEdit(account)}
                     >
                       <Pencil className="w-3.5 h-3.5" />
-                    </Button>
+                    </Button>}
                   </div>
                   <div className="mt-3">
                     <p className="text-sm font-medium text-foreground">{account.name}</p>
@@ -322,12 +327,24 @@ export function AccountsClient() {
                       </Badge>
                     </div>
                   </div>
-                  <p className="text-2xl font-bold mt-3 tabular-nums">{currencyFormatter(account.currency)(account.balance)}</p>
-                  {account.type === "CREDIT_CARD" && (account.creditLimit || account.repaymentDay) && (
-                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                      {account.creditLimit != null && <span>Limit: {currencyFormatter(account.currency)(account.creditLimit)}</span>}
-                      {account.repaymentDay != null && <span>Due: Day {account.repaymentDay}</span>}
-                    </div>
+                  {account.type === "CREDIT_CARD" && account.creditLimit != null ? (
+                    <>
+                      <p className="text-2xl font-bold mt-3 tabular-nums">{currencyFormatter(account.currency)(account.balance)}</p>
+                      <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                        <span>Available of {currencyFormatter(account.currency)(account.creditLimit)}</span>
+                        <span>Used: {currencyFormatter(account.currency)(account.creditLimit - account.balance)}</span>
+                        {account.repaymentDay != null && <span>Due: Day {account.repaymentDay}</span>}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-2xl font-bold mt-3 tabular-nums">{currencyFormatter(account.currency)(account.balance)}</p>
+                      {account.type === "CREDIT_CARD" && account.repaymentDay != null && (
+                        <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                          <span>Due: Day {account.repaymentDay}</span>
+                        </div>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>
@@ -337,7 +354,7 @@ export function AccountsClient() {
       )}
 
       {/* Edit Account Dialog */}
-      <Dialog
+      {!isPartnerView && <Dialog
         open={editDialogOpen}
         onOpenChange={(open) => {
           setEditDialogOpen(open);
@@ -428,7 +445,7 @@ export function AccountsClient() {
             </Button>
           </form>
         </DialogContent>
-      </Dialog>
+      </Dialog>}
     </div>
   );
 }

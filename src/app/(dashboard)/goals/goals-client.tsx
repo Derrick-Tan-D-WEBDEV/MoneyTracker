@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Flag, Trash2, Home, Car, Shield, Sunset, Palmtree, GraduationCap, Target, DollarSign, Wallet, TrendingUp, Calendar } from "lucide-react";
+import { usePartnerView } from "@/hooks/use-partner-view";
 import { getGoals, createGoal, addContribution, deleteGoal } from "@/actions/goals";
 import { getAccounts } from "@/actions/accounts";
 import { toast } from "sonner";
@@ -59,6 +60,7 @@ function getGoalIcon(type: string) {
 
 export function GoalsClient() {
   const { data: session } = useSession();
+  const { isPartnerView } = usePartnerView();
   const userCurrency = session?.user?.currency || "MYR";
   const [goals, setGoals] = useState<Goal[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -179,7 +181,7 @@ export function GoalsClient() {
           <h1 className="text-2xl font-bold text-foreground">Goals</h1>
           <p className="text-muted-foreground">Track progress toward your financial goals</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        {!isPartnerView && <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger render={<Button />}>
             <Plus className="w-4 h-4 mr-2" />
             Add Goal
@@ -285,7 +287,7 @@ export function GoalsClient() {
               </Button>
             </form>
           </DialogContent>
-        </Dialog>
+        </Dialog>}
       </div>
 
       {/* Summary */}
@@ -339,14 +341,14 @@ export function GoalsClient() {
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: goal.color + "20" }}>
                       <Icon className="w-5 h-5" style={{ color: goal.color }} />
                     </div>
-                    <Button
+                    {!isPartnerView && <Button
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500"
                       onClick={() => handleDelete(goal.id)}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
+                    </Button>}
                   </div>
 
                   <div className="mt-3">
@@ -409,7 +411,7 @@ export function GoalsClient() {
                   )}
 
                   {/* Contribute */}
-                  <div className="mt-3 pt-3 border-t">
+                  {!isPartnerView && <div className="mt-3 pt-3 border-t">
                     {contributeId === goal.id ? (
                       <div className="flex gap-2">
                         <Input type="number" step="1" min="1" placeholder="Amount" value={contributeAmount} onChange={(e) => setContributeAmount(e.target.value)} className="h-8 text-sm" />
@@ -434,7 +436,7 @@ export function GoalsClient() {
                         Add Contribution
                       </Button>
                     )}
-                  </div>
+                  </div>}
                 </CardContent>
               </Card>
             );

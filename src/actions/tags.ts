@@ -4,13 +4,13 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { getViewUserId } from "@/lib/partner-view";
 
 export async function getTags() {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await getViewUserId();
 
   const tags = await db.tag.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
     orderBy: { name: "asc" },
   });
 

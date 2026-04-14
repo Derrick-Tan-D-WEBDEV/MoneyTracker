@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { getViewUserId } from "@/lib/partner-view";
 
 const investmentSchema = z.object({
   accountId: z.string().uuid().optional().nullable(),
@@ -19,11 +20,10 @@ const investmentSchema = z.object({
 });
 
 export async function getInvestments() {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await getViewUserId();
 
   const investments = await db.investment.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
     include: { account: true },
     orderBy: { createdAt: "desc" },
   });

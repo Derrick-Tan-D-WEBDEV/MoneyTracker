@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { getViewUserId } from "@/lib/partner-view";
 
 const debtSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -33,11 +34,10 @@ const paymentSchema = z.object({
 });
 
 export async function getDebts() {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await getViewUserId();
 
   const debts = await db.debt.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
     orderBy: [{ isPaidOff: "asc" }, { remainingAmount: "desc" }],
     include: { account: { select: { id: true, name: true, type: true, color: true, creditLimit: true, repaymentDay: true } } },
   });

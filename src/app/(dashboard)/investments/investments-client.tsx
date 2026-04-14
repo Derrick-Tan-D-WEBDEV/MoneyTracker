@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, TrendingUp, TrendingDown, Trash2 } from "lucide-react";
+import { usePartnerView } from "@/hooks/use-partner-view";
 import { getInvestments, createInvestment, deleteInvestment } from "@/actions/investments";
 import { getExchangeRates as fetchExchangeRates } from "@/actions/exchange-rates";
 import { convertCurrency } from "@/lib/exchange-rates";
@@ -50,6 +51,7 @@ interface Investment {
 
 export function InvestmentsClient() {
   const { data: session } = useSession();
+  const { isPartnerView } = usePartnerView();
   const userCurrency = session?.user?.currency || "MYR";
   const formatCurrency = currencyFormatter(userCurrency);
   const [investments, setInvestments] = useState<Investment[]>([]);
@@ -148,7 +150,7 @@ export function InvestmentsClient() {
           <h1 className="text-2xl font-bold text-foreground">Investments</h1>
           <p className="text-muted-foreground">Track your investment portfolio</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        {!isPartnerView && <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger render={<Button />}>
             <Plus className="w-4 h-4 mr-2" />
             Add Investment
@@ -227,7 +229,7 @@ export function InvestmentsClient() {
               </Button>
             </form>
           </DialogContent>
-        </Dialog>
+        </Dialog>}
       </div>
 
       {/* Summary */}
@@ -339,9 +341,9 @@ export function InvestmentsClient() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(inv.id)}>
+                        {!isPartnerView && <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(inv.id)}>
                           <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                        </Button>}
                       </TableCell>
                     </TableRow>
                   ))}

@@ -3,6 +3,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
+import { getViewUserId } from "@/lib/partner-view";
 
 export async function takeNetWorthSnapshot() {
   const session = await auth();
@@ -16,7 +17,15 @@ export async function takeNetWorthSnapshot() {
     where: { userId, isArchived: false },
   });
 
-  const netWorth = accounts.reduce((sum, acc) => sum + convertCurrency(Number(acc.balance), acc.currency, userCurrency, rates), 0);
+  const netWorth = accounts.reduce((sum, acc) => {
+    const converted = convertCurrency(Number(acc.balance), acc.currency, userCurrency, rates);
+    if (acc.type === "CREDIT_CARD") {
+      // Balance = available credit; liability = creditLimit - balance
+      const limit = acc.creditLimit ? convertCurrency(Number(acc.creditLimit), acc.currency, userCurrency, rates) : 0;
+      return sum - (limit - converted);
+    }
+    return sum + converted;
+  }, 0);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -31,15 +40,14 @@ export async function takeNetWorthSnapshot() {
 }
 
 export async function getNetWorthHistory(months = 12) {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await getViewUserId();
 
   const since = new Date();
   since.setMonth(since.getMonth() - months);
 
   const snapshots = await db.netWorthSnapshot.findMany({
     where: {
-      userId: session.user.id,
+      userId,
       date: { gte: since },
     },
     orderBy: { date: "asc" },

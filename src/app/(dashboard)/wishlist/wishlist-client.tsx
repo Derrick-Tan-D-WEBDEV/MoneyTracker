@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Star, Trash2, ExternalLink, ShoppingBag, Check } from "lucide-react";
+import { usePartnerView } from "@/hooks/use-partner-view";
 import { getWishlistItems, createWishlistItem, toggleWishlistItem, deleteWishlistItem } from "@/actions/wishlist";
 import { currencyFormatter } from "@/lib/format";
 import { SUPPORTED_CURRENCIES } from "@/lib/constants";
@@ -40,6 +41,7 @@ const PRIORITY_COLORS: Record<number, string> = {
 
 export function WishlistClient() {
   const { data: session } = useSession();
+  const { isPartnerView } = usePartnerView();
   const userCurrency = session?.user?.currency || "USD";
   const formatCurrency = currencyFormatter(userCurrency);
 
@@ -126,7 +128,7 @@ export function WishlistClient() {
           <h1 className="text-2xl font-bold text-foreground">Wishlist</h1>
           <p className="text-muted-foreground">Track planned purchases and savings goals</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        {!isPartnerView && <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger render={<Button />}>
             <Plus className="w-4 h-4 mr-2" />
             Add Item
@@ -200,7 +202,7 @@ export function WishlistClient() {
               </Button>
             </form>
           </DialogContent>
-        </Dialog>
+        </Dialog>}
       </div>
 
       {/* Summary */}
@@ -280,14 +282,14 @@ export function WishlistClient() {
                           {item.notes && <p className="text-xs text-muted-foreground mt-1">{item.notes}</p>}
                         </div>
                       </div>
-                      <Button
+                      {!isPartnerView && <Button
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 shrink-0"
                         onClick={() => handleDelete(item.id)}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
+                      </Button>}
                     </div>
                   </CardContent>
                 </Card>
@@ -313,14 +315,14 @@ export function WishlistClient() {
                           </div>
                         </div>
                       </div>
-                      <Button
+                      {!isPartnerView && <Button
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 shrink-0"
                         onClick={() => handleDelete(item.id)}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
+                      </Button>}
                     </div>
                   </CardContent>
                 </Card>

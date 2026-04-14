@@ -3,7 +3,7 @@
 import { signOut, useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Bell, Search, LogOut, User, Settings } from "lucide-react";
+import { Bell, Search, LogOut, User, Settings, Heart, ArrowLeftRight, Eye } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { LevelBadge } from "@/components/dashboard/level-badge";
 import { StreakBadge } from "@/components/dashboard/streak-badge";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
+import { usePartnerView } from "@/hooks/use-partner-view";
 
 const tabs = [
   { href: "/", label: "Overview" },
@@ -38,6 +39,7 @@ const pageTitles: Record<string, string> = {
   "/export": "Export",
   "/tax": "Tax Prediction",
   "/settings": "Settings",
+  "/partner": "Partner",
 };
 
 function getPageTitle(pathname: string): string {
@@ -46,11 +48,18 @@ function getPageTitle(pathname: string): string {
   return match ? pageTitles[match] : "MoneyTracker";
 }
 
-export function TopNav() {
+type LinkedPartner = {
+  id: string;
+  name: string | null;
+  image: string | null;
+} | null;
+
+export function TopNav({ linkedPartner }: { linkedPartner?: LinkedPartner }) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const user = session?.user;
   const pageTitle = getPageTitle(pathname);
+  const { isPartnerView, partnerName, switchToPartner, switchToSelf } = usePartnerView();
 
   const initials = user?.name
     ? user.name
@@ -62,6 +71,24 @@ export function TopNav() {
 
   return (
     <header className="sticky top-0 z-30 border-b bg-card/95 backdrop-blur-sm flex flex-col" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      {/* Partner view banner */}
+      {isPartnerView && (
+        <div className="bg-pink-500/10 border-b border-pink-500/20 px-4 py-1.5 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-pink-700 dark:text-pink-300">
+            <Eye className="w-3.5 h-3.5" />
+            <span>Viewing <strong>{partnerName}</strong>&apos;s data (read-only)</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => switchToSelf()}
+            className="text-pink-700 dark:text-pink-300 hover:text-pink-900 dark:hover:text-pink-100 h-6 text-xs gap-1"
+          >
+            <ArrowLeftRight className="w-3 h-3" />
+            Switch back
+          </Button>
+        </div>
+      )}
       <div className="h-14 md:h-16 flex items-center px-4 md:px-6 gap-4 md:gap-6">
         {/* App name - always visible on desktop, shows page title on mobile */}
         <Link href="/" className="text-lg font-bold text-foreground shrink-0">
@@ -90,6 +117,20 @@ export function TopNav() {
 
         {/* Right side */}
         <div className="ml-auto flex items-center gap-1.5 md:gap-3">
+          {/* Partner Switch Button */}
+          {linkedPartner && !isPartnerView && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => switchToPartner(linkedPartner.id)}
+              className="gap-1.5 text-pink-600 dark:text-pink-400 hover:text-pink-700 hover:bg-pink-50 dark:hover:bg-pink-950/30"
+              title={`View ${linkedPartner.name || "Partner"}'s finances`}
+            >
+              <Heart className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline text-xs">{linkedPartner.name || "Partner"}</span>
+            </Button>
+          )}
+
           <StreakBadge streak={user?.streak ?? 0} />
           <LevelBadge xp={user?.xp ?? 0} level={user?.level ?? 1} compact />
           <Button variant="ghost" size="icon" className="hidden md:inline-flex text-muted-foreground hover:text-foreground">

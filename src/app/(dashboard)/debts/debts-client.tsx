@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Plus, Landmark, Car, Home, GraduationCap, CreditCard, HeartPulse, CircleDollarSign, Trash2, BadgeCheck, Banknote, CalendarDays, Percent, TrendingDown } from "lucide-react";
+import { usePartnerView } from "@/hooks/use-partner-view";
 import { getDebts, createDebt, makePayment, deleteDebt } from "@/actions/debts";
 import { getAccounts } from "@/actions/accounts";
 import { getExchangeRates as fetchExchangeRates } from "@/actions/exchange-rates";
@@ -83,6 +84,7 @@ function getDebtTypeLabel(type: string) {
 
 export function DebtsClient() {
   const { data: session } = useSession();
+  const { isPartnerView } = usePartnerView();
   const userCurrency = session?.user?.currency || "MYR";
   const formatCurrency = currencyFormatter(userCurrency);
   const [debts, setDebts] = useState<Debt[]>([]);
@@ -249,7 +251,7 @@ export function DebtsClient() {
           <h1 className="text-2xl font-bold">Debts & Loans</h1>
           <p className="text-muted-foreground text-sm">Track and pay off what you owe</p>
         </div>
-        <Dialog
+        {!isPartnerView && <Dialog
           open={dialogOpen}
           onOpenChange={(open) => {
             setDialogOpen(open);
@@ -415,7 +417,7 @@ export function DebtsClient() {
               </Button>
             </form>
           </DialogContent>
-        </Dialog>
+        </Dialog>}
       </div>
 
       {/* Stats cards */}
@@ -607,7 +609,7 @@ export function DebtsClient() {
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center gap-2 shrink-0">
+                        {!isPartnerView && <div className="flex items-center gap-2 shrink-0">
                           <Button
                             size="sm"
                             variant="outline"
@@ -620,7 +622,7 @@ export function DebtsClient() {
                           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(debt.id)}>
                             <Trash2 className="w-4 h-4" />
                           </Button>
-                        </div>
+                        </div>}
                       </div>
                     </CardContent>
                   </Card>
@@ -659,9 +661,9 @@ export function DebtsClient() {
                             {debt.lender && ` · ${debt.lender}`}
                           </p>
                         </div>
-                        <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(debt.id)}>
+                        {!isPartnerView && <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(debt.id)}>
                           <Trash2 className="w-4 h-4" />
-                        </Button>
+                        </Button>}
                       </div>
                     </CardContent>
                   </Card>

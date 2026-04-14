@@ -3,13 +3,13 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
+import { getViewUser, isPartnerView } from "@/lib/partner-view";
 
 export async function getDashboardData() {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
-  const userId = session.user.id;
-  const userCurrency = session.user.currency || "MYR";
+  const { id: userId, currency: userCurrency } = await getViewUser();
   const rates = await getExchangeRates(userCurrency);
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -24,18 +24,28 @@ export async function getDashboardData() {
     where: { userId, isArchived: false },
   });
 
-  const totalBalance = accounts.reduce((sum, acc) => sum + toUser(Number(acc.balance), acc.currency), 0);
+  const totalBalance = accounts.reduce((sum, acc) => {
+    const converted = toUser(Number(acc.balance), acc.currency);
+    if (acc.type === "CREDIT_CARD") {
+      // Balance = available credit; liability = creditLimit - balance
+      const limit = acc.creditLimit ? toUser(Number(acc.creditLimit), acc.currency) : 0;
+      return sum - (limit - converted);
+    }
+    return sum + converted;
+  }, 0);
 
-  // Auto-record daily net worth snapshot
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  db.netWorthSnapshot
-    .upsert({
-      where: { userId_date: { userId, date: today } },
-      update: { netWorth: totalBalance },
-      create: { userId, date: today, netWorth: totalBalance },
-    })
-    .catch(() => {});
+  // Auto-record daily net worth snapshot (only for own data, not partner view)
+  if (!(await isPartnerView())) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    db.netWorthSnapshot
+      .upsert({
+        where: { userId_date: { userId, date: today } },
+        update: { netWorth: totalBalance },
+        create: { userId, date: today, netWorth: totalBalance },
+      })
+      .catch(() => {});
+  }
 
   // Current month transactions
   const currentMonthTransactions = await db.transaction.findMany({

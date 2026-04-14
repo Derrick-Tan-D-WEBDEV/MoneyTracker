@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { getViewUserId } from "@/lib/partner-view";
 
 const wishlistSchema = z.object({
   name: z.string().min(1),
@@ -16,11 +17,10 @@ const wishlistSchema = z.object({
 });
 
 export async function getWishlistItems() {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await getViewUserId();
 
   const items = await db.wishlistItem.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
     orderBy: [{ isPurchased: "asc" }, { priority: "desc" }, { createdAt: "desc" }],
   });
 

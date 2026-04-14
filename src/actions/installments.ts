@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { getViewUserId } from "@/lib/partner-view";
 
 const installmentSchema = z.object({
   accountId: z.string().uuid(),
@@ -25,11 +26,10 @@ const paymentSchema = z.object({
 });
 
 export async function getInstallments() {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await getViewUserId();
 
   const installments = await db.installment.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
     include: { account: { select: { id: true, name: true, type: true, color: true, creditLimit: true, repaymentDay: true } } },
     orderBy: [{ isCompleted: "asc" }, { startDate: "desc" }],
   });

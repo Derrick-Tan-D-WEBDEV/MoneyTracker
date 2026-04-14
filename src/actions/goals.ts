@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { getViewUserId } from "@/lib/partner-view";
 
 const goalSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -26,11 +27,10 @@ const goalSchema = z.object({
 });
 
 export async function getGoals() {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await getViewUserId();
 
   const goals = await db.goal.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
     include: { account: { select: { id: true, name: true, type: true, currency: true } } },
     orderBy: { createdAt: "desc" },
   });

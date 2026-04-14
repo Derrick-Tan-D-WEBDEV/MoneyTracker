@@ -217,7 +217,15 @@ export async function getPartnerDashboardData() {
     }),
   ]);
 
-  const totalBalance = accounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
+  const totalBalance = accounts.reduce((sum, acc) => {
+    const bal = Number(acc.balance);
+    if (acc.type === "CREDIT_CARD") {
+      // Balance = available credit; liability = creditLimit - balance
+      const limit = acc.creditLimit ? Number(acc.creditLimit) : 0;
+      return sum - (limit - bal);
+    }
+    return sum + bal;
+  }, 0);
   const monthIncome = transactions.filter((t) => t.type === "INCOME").reduce((sum, t) => sum + Number(t.amount), 0);
   const monthExpenses = transactions.filter((t) => t.type === "EXPENSE").reduce((sum, t) => sum + Number(t.amount), 0);
 

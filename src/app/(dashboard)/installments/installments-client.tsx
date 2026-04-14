@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Plus, CreditCard, ShoppingBag, ArrowLeftRight, Trash2, BadgeCheck, CalendarDays, Percent, Banknote, Store, CheckCircle2 } from "lucide-react";
+import { usePartnerView } from "@/hooks/use-partner-view";
 import { getInstallments, createInstallment, makeInstallmentPayment, deleteInstallment } from "@/actions/installments";
 import { getAccounts } from "@/actions/accounts";
 import { getExchangeRates as fetchExchangeRates } from "@/actions/exchange-rates";
@@ -52,6 +53,7 @@ interface Account {
 
 export function InstallmentsClient() {
   const { data: session } = useSession();
+  const { isPartnerView } = usePartnerView();
   const userCurrency = session?.user?.currency || "MYR";
   const formatCurrency = currencyFormatter(userCurrency);
   const [installments, setInstallments] = useState<Installment[]>([]);
@@ -214,7 +216,7 @@ export function InstallmentsClient() {
           <h1 className="text-2xl font-bold">Installments</h1>
           <p className="text-muted-foreground text-sm">Track credit card installment plans & balance transfers</p>
         </div>
-        <Dialog
+        {!isPartnerView && <Dialog
           open={dialogOpen}
           onOpenChange={(open) => {
             setDialogOpen(open);
@@ -367,7 +369,7 @@ export function InstallmentsClient() {
               </form>
             )}
           </DialogContent>
-        </Dialog>
+        </Dialog>}
       </div>
 
       {/* Stats */}
@@ -573,7 +575,7 @@ export function InstallmentsClient() {
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center gap-2 shrink-0">
+                        {!isPartnerView && <div className="flex items-center gap-2 shrink-0">
                           <Button
                             size="sm"
                             variant="outline"
@@ -586,7 +588,7 @@ export function InstallmentsClient() {
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(inst.id)}>
                             <Trash2 className="w-4 h-4" />
                           </Button>
-                        </div>
+                        </div>}
                       </div>
                     </CardContent>
                   </Card>
@@ -620,9 +622,9 @@ export function InstallmentsClient() {
                         <span className="text-sm text-muted-foreground">
                           {fmtInst(inst.totalAmount)} · {inst.totalMonths} months
                         </span>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(inst.id)}>
+                        {!isPartnerView && <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(inst.id)}>
                           <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                        </Button>}
                       </div>
                     </CardContent>
                   </Card>

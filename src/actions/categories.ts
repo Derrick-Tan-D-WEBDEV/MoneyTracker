@@ -2,13 +2,13 @@
 
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getViewUserId } from "@/lib/partner-view";
 
 export async function getCategories(type?: "EXPENSE" | "INCOME") {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await getViewUserId();
 
   const where: Record<string, unknown> = {
-    OR: [{ userId: session.user.id }, { isDefault: true }],
+    OR: [{ userId }, { isDefault: true }],
   };
 
   if (type) {

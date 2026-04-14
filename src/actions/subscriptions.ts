@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { getViewUserId } from "@/lib/partner-view";
 
 const subscriptionSchema = z.object({
   name: z.string().min(1),
@@ -19,11 +20,10 @@ const subscriptionSchema = z.object({
 });
 
 export async function getSubscriptions() {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await getViewUserId();
 
   const subscriptions = await db.subscription.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
     include: { category: true },
     orderBy: [{ isActive: "desc" }, { nextBillingDate: "asc" }],
   });
