@@ -135,6 +135,8 @@ export async function updateInstallment(id: string, data: z.input<typeof install
 
   const parsed = installmentSchema.parse(data);
   const monthlyPayment = parsed.totalAmount / parsed.totalMonths;
+  const paidMonths = Math.min(parsed.paidMonths, parsed.totalMonths);
+  const isCompleted = paidMonths >= parsed.totalMonths;
 
   await db.installment.update({
     where: { id },
@@ -146,6 +148,8 @@ export async function updateInstallment(id: string, data: z.input<typeof install
       totalAmount: parsed.totalAmount,
       monthlyPayment,
       totalMonths: parsed.totalMonths,
+      paidMonths,
+      isCompleted,
       interestRate: parsed.interestRate,
       startDate: parsed.startDate,
       currency: parsed.currency,

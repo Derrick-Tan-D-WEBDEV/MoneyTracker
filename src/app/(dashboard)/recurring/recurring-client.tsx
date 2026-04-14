@@ -10,10 +10,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Repeat, ArrowUpRight, ArrowDownRight, Trash2, CalendarClock, Play, Pause, Zap } from "lucide-react";
+import { Plus, Repeat, ArrowUpRight, ArrowDownRight, Trash2, CalendarClock, Play, Pause, Zap, Pencil } from "lucide-react";
 import { usePartnerView } from "@/hooks/use-partner-view";
 import { getCategoryIcon } from "@/lib/category-icons";
-import { getRecurringRules, createRecurringRule, toggleRecurringRule, deleteRecurringRule, processRecurringTransactions } from "@/actions/recurring";
+import { getRecurringRules, createRecurringRule, updateRecurringRule, toggleRecurringRule, deleteRecurringRule, processRecurringTransactions } from "@/actions/recurring";
 import { getAccounts } from "@/actions/accounts";
 import { getCategories } from "@/actions/categories";
 import { currencyFormatter } from "@/lib/format";
@@ -76,6 +76,7 @@ export function RecurringClient() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingRule, setEditingRule] = useState<RecurringRule | null>(null);
   const [processing, setProcessing] = useState(false);
 
   // Form state
@@ -106,6 +107,7 @@ export function RecurringClient() {
   }, []);
 
   const resetForm = () => {
+    setEditingRule(null);
     setFormType("EXPENSE");
     setFormAccountId("");
     setFormCategoryId("");
@@ -116,25 +118,44 @@ export function RecurringClient() {
     setFormNextDue(new Date().toISOString().split("T")[0]);
   };
 
+  const populateForm = (rule: RecurringRule) => {
+    setEditingRule(rule);
+    setFormType(rule.transaction.type as "EXPENSE" | "INCOME");
+    setFormAccountId(rule.transaction.account.id);
+    setFormCategoryId(rule.transaction.category?.id || "");
+    setFormAmount(String(rule.transaction.amount));
+    setFormDescription(rule.transaction.description);
+    setFormNotes(rule.transaction.notes || "");
+    setFormFrequency(rule.frequency);
+    setFormNextDue(rule.nextDue.split("T")[0]);
+    setDialogOpen(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const payload = {
+      accountId: formAccountId,
+      categoryId: formCategoryId || null,
+      type: formType,
+      amount: parseFloat(formAmount),
+      description: formDescription,
+      notes: formNotes || null,
+      frequency: formFrequency as "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY",
+      nextDue: formNextDue,
+    };
     try {
-      await createRecurringRule({
-        accountId: formAccountId,
-        categoryId: formCategoryId || null,
-        type: formType,
-        amount: parseFloat(formAmount),
-        description: formDescription,
-        notes: formNotes || null,
-        frequency: formFrequency as "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY",
-        nextDue: formNextDue,
-      });
-      toast.success("Recurring transaction created");
+      if (editingRule) {
+        await updateRecurringRule(editingRule.id, payload);
+        toast.success("Recurring transaction updated");
+      } else {
+        await createRecurringRule(payload);
+        toast.success("Recurring transaction created");
+      }
       setDialogOpen(false);
       resetForm();
       fetchData();
     } catch {
-      toast.error("Failed to create recurring transaction");
+      toast.error(editingRule ? "Failed to update" : "Failed to create recurring transaction");
     }
   };
 
@@ -256,7 +277,7 @@ export function RecurringClient() {
               />
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>New Recurring Transaction</DialogTitle>
+                  <DialogTitle>{editingRule ? "Edit Recurring Transaction" : "New Recurring Transaction"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   {/* Type toggle */}
@@ -366,7 +387,7 @@ export function RecurringClient() {
                   </div>
 
                   <Button type="submit" className="w-full">
-                    Create Recurring Transaction
+                    {editingRule ? "Save Changes" : "Create Recurring Transaction"}
                   </Button>
                 </form>
               </DialogContent>
@@ -489,6 +510,9 @@ export function RecurringClient() {
                     {!isPartnerView && (
                       <div className="flex items-center gap-2 shrink-0">
                         <Switch checked={rule.isActive} onCheckedChange={(checked) => handleToggle(rule.id, checked)} />
+                        <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={() => populateForm(rule)}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
                         <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(rule.id)}>
                           <Trash2 className="w-4 h-4" />
                         </Button>

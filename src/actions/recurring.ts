@@ -189,6 +189,51 @@ export async function toggleRecurringRule(id: string, isActive: boolean) {
   return { success: true };
 }
 
+export async function updateRecurringRule(id: string, data: z.input<typeof recurringSchema>) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  const rule = await db.recurringRule.findFirst({
+    where: { id, transaction: { userId: session.user.id } },
+    include: { transaction: true },
+  });
+  if (!rule) throw new Error("Rule not found");
+
+  const parsed = recurringSchema.parse(data);
+
+  // Verify account belongs to user
+  const account = await db.financialAccount.findFirst({
+    where: { id: parsed.accountId, userId: session.user.id },
+  });
+  if (!account) throw new Error("Account not found");
+
+  // Update the template transaction
+  await db.transaction.update({
+    where: { id: rule.transactionId },
+    data: {
+      accountId: parsed.accountId,
+      categoryId: parsed.categoryId || null,
+      type: parsed.type,
+      amount: parsed.amount,
+      description: parsed.description,
+      notes: parsed.notes || null,
+    },
+  });
+
+  // Update the rule
+  await db.recurringRule.update({
+    where: { id },
+    data: {
+      frequency: parsed.frequency,
+      nextDue: parsed.nextDue,
+    },
+  });
+
+  revalidatePath("/recurring");
+  revalidatePath("/");
+  return { success: true };
+}
+
 export async function deleteRecurringRule(id: string) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");

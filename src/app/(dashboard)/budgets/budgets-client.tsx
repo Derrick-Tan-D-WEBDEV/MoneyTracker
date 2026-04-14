@@ -10,10 +10,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Target, Trash2, AlertTriangle, Bell } from "lucide-react";
+import { Plus, Target, Trash2, AlertTriangle, Bell, Pencil } from "lucide-react";
 import { usePartnerView } from "@/hooks/use-partner-view";
 import { getCategoryIcon } from "@/lib/category-icons";
-import { getBudgets, createBudget, deleteBudget } from "@/actions/budgets";
+import { getBudgets, createBudget, updateBudget, deleteBudget } from "@/actions/budgets";
 import { getCategories } from "@/actions/categories";
 import { toast } from "sonner";
 import { currencyFormatter } from "@/lib/format";
@@ -53,6 +53,7 @@ export function BudgetsClient() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
 
   const [formCategoryId, setFormCategoryId] = useState("");
   const [formAmount, setFormAmount] = useState("");
@@ -62,7 +63,7 @@ export function BudgetsClient() {
 
   const fetchData = async () => {
     try {
-      const [budgetData, catData] = await Promise.all([getBudgets(), getCategories("EXPENSE")]);
+      const [budgetData, catData] = await Promise.all([getBudgets().catch(() => [] as Budget[]), getCategories("EXPENSE")]);
       setBudgets(budgetData);
       setCategories(catData);
     } catch {
@@ -76,26 +77,49 @@ export function BudgetsClient() {
     fetchData();
   }, []);
 
+  const populateEditForm = (budget: Budget) => {
+    setEditingBudget(budget);
+    setFormCategoryId(budget.categoryId);
+    setFormAmount(String(budget.amount));
+    setFormCurrency(budget.currency);
+    setFormPeriod(budget.period);
+    setFormAlertThreshold(String(budget.alertThreshold));
+    setDialogOpen(true);
+  };
+
+  const resetForm = () => {
+    setEditingBudget(null);
+    setFormCategoryId("");
+    setFormAmount("");
+    setFormCurrency(session?.user?.currency || "MYR");
+    setFormPeriod("MONTHLY");
+    setFormAlertThreshold("80");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const payload = {
+      categoryId: formCategoryId,
+      amount: parseFloat(formAmount),
+      currency: formCurrency,
+      period: formPeriod as "WEEKLY" | "MONTHLY" | "YEARLY",
+      alertThreshold: parseInt(formAlertThreshold) || 80,
+      startDate: new Date().toISOString(),
+      endDate: null,
+    };
     try {
-      await createBudget({
-        categoryId: formCategoryId,
-        amount: parseFloat(formAmount),
-        currency: formCurrency,
-        period: formPeriod as "WEEKLY" | "MONTHLY" | "YEARLY",
-        alertThreshold: parseInt(formAlertThreshold) || 80,
-        startDate: new Date().toISOString(),
-        endDate: null,
-      });
-      toast.success("Budget created");
+      if (editingBudget) {
+        await updateBudget(editingBudget.id, payload);
+        toast.success("Budget updated");
+      } else {
+        await createBudget(payload);
+        toast.success("Budget created");
+      }
       setDialogOpen(false);
-      setFormCategoryId("");
-      setFormAmount("");
-      setFormCurrency(session?.user?.currency || "MYR");
+      resetForm();
       fetchData();
     } catch {
-      toast.error("Failed to create budget");
+      toast.error(editingBudget ? "Failed to update budget" : "Failed to create budget");
     }
   };
 
@@ -121,14 +145,20 @@ export function BudgetsClient() {
           <p className="text-muted-foreground">Set spending limits per category</p>
         </div>
         {!isPartnerView && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog
+            open={dialogOpen}
+            onOpenChange={(open) => {
+              setDialogOpen(open);
+              if (!open) resetForm();
+            }}
+          >
             <DialogTrigger render={<Button />}>
               <Plus className="w-4 h-4 mr-2" />
               Add Budget
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Create Budget</DialogTitle>
+                <DialogTitle>{editingBudget ? "Edit Budget" : "Create Budget"}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
@@ -195,7 +225,7 @@ export function BudgetsClient() {
                 </div>
 
                 <Button type="submit" className="w-full">
-                  Create Budget
+                  {editingBudget ? "Save Changes" : "Create Budget"}
                 </Button>
               </form>
             </DialogContent>
@@ -296,14 +326,24 @@ export function BudgetsClient() {
                     </Badge>
                   </div>
                   {!isPartnerView && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500"
-                      onClick={() => handleDelete(budget.id)}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-foreground"
+                        onClick={() => populateEditForm(budget)}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500"
+                        onClick={() => handleDelete(budget.id)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
                   )}
                 </div>
 

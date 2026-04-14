@@ -2,6 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
 
@@ -217,17 +218,22 @@ export async function getPartnerDashboardData() {
     }),
   ]);
 
-  const totalBalance = accounts.reduce((sum, acc) => {
+  const rates = await getExchangeRates(partnerCurrency);
+  const toPC = (amount: number, from: string) => convertCurrency(amount, from, partnerCurrency, rates);
+
+  const accountBalance = accounts.reduce((sum, acc) => {
     const bal = Number(acc.balance);
     if (acc.type === "CREDIT_CARD") {
-      // Balance = available credit; liability = creditLimit - balance
       const limit = acc.creditLimit ? Number(acc.creditLimit) : 0;
-      return sum - (limit - bal);
+      return sum - toPC(limit - bal, acc.currency);
     }
-    return sum + bal;
+    return sum + toPC(bal, acc.currency);
   }, 0);
-  const monthIncome = transactions.filter((t) => t.type === "INCOME").reduce((sum, t) => sum + Number(t.amount), 0);
-  const monthExpenses = transactions.filter((t) => t.type === "EXPENSE").reduce((sum, t) => sum + Number(t.amount), 0);
+  const totalDebtAmount = debts.reduce((sum, d) => sum + toPC(Number(d.remainingAmount), d.currency), 0);
+  const totalBalance = accountBalance - totalDebtAmount;
+
+  const monthIncome = transactions.filter((t) => t.type === "INCOME").reduce((sum, t) => sum + toPC(Number(t.amount), t.account.currency), 0);
+  const monthExpenses = transactions.filter((t) => t.type === "EXPENSE").reduce((sum, t) => sum + toPC(Number(t.amount), t.account.currency), 0);
 
   return {
     partner: {
@@ -277,6 +283,6 @@ export async function getPartnerDashboardData() {
       originalAmount: Number(d.originalAmount),
       remainingAmount: Number(d.remainingAmount),
     })),
-    totalDebt: debts.reduce((sum, d) => sum + Number(d.remainingAmount), 0),
+    totalDebt: debts.reduce((sum, d) => sum + toPC(Number(d.remainingAmount), d.currency), 0),
   };
 }

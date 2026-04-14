@@ -63,10 +63,10 @@ export async function getMonthlyProgress(): Promise<MonthlyProgress> {
   });
 
   const activeGoals = goals.filter((g) => Number(g.currentAmount) < Number(g.targetAmount));
-  const totalTargetSum = activeGoals.reduce((s, g) => s + Number(g.targetAmount), 0);
-  const totalCurrentSum = activeGoals.reduce((s, g) => s + Number(g.currentAmount), 0);
+  const totalTargetSum = activeGoals.reduce((s, g) => s + convertCurrency(Number(g.targetAmount), g.currency || userCurrency, userCurrency, rates), 0);
+  const totalCurrentSum = activeGoals.reduce((s, g) => s + convertCurrency(Number(g.currentAmount), g.currency || userCurrency, userCurrency, rates), 0);
   const totalGoalProgress = totalTargetSum > 0 ? (totalCurrentSum / totalTargetSum) * 100 : 0;
-  const goalContributionsThisMonth = activeGoals.reduce((s, g) => s + Number(g.monthlyContribution), 0);
+  const goalContributionsThisMonth = activeGoals.reduce((s, g) => s + convertCurrency(Number(g.monthlyContribution), g.currency || userCurrency, userCurrency, rates), 0);
 
   // Savings accounts
   const savingsAccounts = await db.financialAccount.findMany({
@@ -80,7 +80,7 @@ export async function getMonthlyProgress(): Promise<MonthlyProgress> {
     const rate = Number(g.interestRate);
     if (rate <= 0) return s;
     const monthlyInterest = Number(g.currentAmount) * (rate / 100 / 12);
-    return s + monthlyInterest;
+    return s + convertCurrency(monthlyInterest, g.currency || userCurrency, userCurrency, rates);
   }, 0);
 
   // Upcoming bills this month (debts by due day, installments)

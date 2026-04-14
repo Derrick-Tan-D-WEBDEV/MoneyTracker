@@ -17,7 +17,11 @@ export async function takeNetWorthSnapshot() {
     where: { userId, isArchived: false },
   });
 
-  const netWorth = accounts.reduce((sum, acc) => {
+  const debts = await db.debt.findMany({
+    where: { userId, isPaidOff: false },
+  });
+
+  const accountBalance = accounts.reduce((sum, acc) => {
     const converted = convertCurrency(Number(acc.balance), acc.currency, userCurrency, rates);
     if (acc.type === "CREDIT_CARD") {
       // Balance = available credit; liability = creditLimit - balance
@@ -26,6 +30,12 @@ export async function takeNetWorthSnapshot() {
     }
     return sum + converted;
   }, 0);
+
+  const totalDebt = debts.reduce((sum, d) => {
+    return sum + convertCurrency(Number(d.remainingAmount), d.currency, userCurrency, rates);
+  }, 0);
+
+  const netWorth = accountBalance - totalDebt;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);

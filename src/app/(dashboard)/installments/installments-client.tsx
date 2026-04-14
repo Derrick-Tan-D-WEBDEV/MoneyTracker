@@ -10,9 +10,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
-import { Plus, CreditCard, ShoppingBag, ArrowLeftRight, Trash2, BadgeCheck, CalendarDays, Percent, Banknote, Store, CheckCircle2 } from "lucide-react";
+import { Plus, CreditCard, ShoppingBag, ArrowLeftRight, Trash2, BadgeCheck, CalendarDays, Percent, Banknote, Store, CheckCircle2, Pencil } from "lucide-react";
 import { usePartnerView } from "@/hooks/use-partner-view";
-import { getInstallments, createInstallment, makeInstallmentPayment, deleteInstallment } from "@/actions/installments";
+import { getInstallments, createInstallment, updateInstallment, makeInstallmentPayment, deleteInstallment } from "@/actions/installments";
 import { getAccounts } from "@/actions/accounts";
 import { getExchangeRates as fetchExchangeRates } from "@/actions/exchange-rates";
 import { convertCurrency } from "@/lib/exchange-rates";
@@ -61,6 +61,7 @@ export function InstallmentsClient() {
   const [rates, setRates] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingInstallment, setEditingInstallment] = useState<Installment | null>(null);
   const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [payInstallmentId, setPayInstallmentId] = useState<string | null>(null);
   const [payMonths, setPayMonths] = useState("1");
@@ -98,6 +99,7 @@ export function InstallmentsClient() {
   }, []);
 
   const resetForm = () => {
+    setEditingInstallment(null);
     setFormName("");
     setFormType("PURCHASE");
     setFormMerchant("");
@@ -111,32 +113,54 @@ export function InstallmentsClient() {
     setFormNotes("");
   };
 
+  const populateEditForm = (inst: Installment) => {
+    setEditingInstallment(inst);
+    setFormName(inst.name);
+    setFormType(inst.type);
+    setFormMerchant(inst.merchant || "");
+    setFormAccountId(inst.account.id);
+    setFormTotalAmount(String(inst.totalAmount));
+    setFormTotalMonths(String(inst.totalMonths));
+    setFormPaidMonths(String(inst.paidMonths));
+    setFormInterestRate(String(inst.interestRate));
+    setFormStartDate(inst.startDate.split("T")[0]);
+    setFormCurrency(inst.currency);
+    setFormNotes(inst.notes || "");
+    setDialogOpen(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formAccountId) {
       toast.error("Please select a credit card");
       return;
     }
+    const payload = {
+      accountId: formAccountId,
+      name: formName,
+      type: formType as "PURCHASE" | "BALANCE_TRANSFER",
+      merchant: formMerchant || null,
+      totalAmount: parseFloat(formTotalAmount),
+      totalMonths: parseInt(formTotalMonths),
+      paidMonths: formPaidMonths ? parseInt(formPaidMonths) : 0,
+      interestRate: formInterestRate ? parseFloat(formInterestRate) : 0,
+      startDate: formStartDate,
+      currency: formCurrency,
+      notes: formNotes || null,
+    };
     try {
-      await createInstallment({
-        accountId: formAccountId,
-        name: formName,
-        type: formType as "PURCHASE" | "BALANCE_TRANSFER",
-        merchant: formMerchant || null,
-        totalAmount: parseFloat(formTotalAmount),
-        totalMonths: parseInt(formTotalMonths),
-        paidMonths: formPaidMonths ? parseInt(formPaidMonths) : 0,
-        interestRate: formInterestRate ? parseFloat(formInterestRate) : 0,
-        startDate: formStartDate,
-        currency: formCurrency,
-        notes: formNotes || null,
-      });
-      toast.success("Installment added");
+      if (editingInstallment) {
+        await updateInstallment(editingInstallment.id, payload);
+        toast.success("Installment updated");
+      } else {
+        await createInstallment(payload);
+        toast.success("Installment added");
+      }
       setDialogOpen(false);
       resetForm();
       fetchData();
     } catch {
-      toast.error("Failed to add installment");
+      toast.error(editingInstallment ? "Failed to update installment" : "Failed to add installment");
     }
   };
 
@@ -233,7 +257,7 @@ export function InstallmentsClient() {
             />
             <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Add Installment Plan</DialogTitle>
+                <DialogTitle>{editingInstallment ? "Edit Installment Plan" : "Add Installment Plan"}</DialogTitle>
               </DialogHeader>
               {creditCardAccounts.length === 0 ? (
                 <div className="text-center py-6">
@@ -273,13 +297,16 @@ export function InstallmentsClient() {
                     </div>
                     <div className="space-y-2">
                       <Label>Credit Card</Label>
-                      <Select value={formAccountId} onValueChange={(v) => {
-                        if (v) {
-                          setFormAccountId(v);
-                          const acc = creditCardAccounts.find((a) => a.id === v);
-                          if (acc) setFormCurrency(acc.currency);
-                        }
-                      }}>
+                      <Select
+                        value={formAccountId}
+                        onValueChange={(v) => {
+                          if (v) {
+                            setFormAccountId(v);
+                            const acc = creditCardAccounts.find((a) => a.id === v);
+                            if (acc) setFormCurrency(acc.currency);
+                          }
+                        }}
+                      >
                         <SelectTrigger>
                           <SelectValue>{(value: string) => creditCardAccounts.find((a) => a.id === value)?.name || "Select card"}</SelectValue>
                         </SelectTrigger>
@@ -371,7 +398,7 @@ export function InstallmentsClient() {
                   </div>
 
                   <Button type="submit" className="w-full">
-                    Add Installment
+                    {editingInstallment ? "Save Changes" : "Add Installment"}
                   </Button>
                 </form>
               )}
@@ -593,6 +620,9 @@ export function InstallmentsClient() {
                             >
                               <Banknote className="w-4 h-4 mr-1" />
                               Pay
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => populateEditForm(inst)}>
+                              <Pencil className="w-4 h-4" />
                             </Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(inst.id)}>
                               <Trash2 className="w-4 h-4" />

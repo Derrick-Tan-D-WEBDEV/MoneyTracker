@@ -88,6 +88,35 @@ export async function toggleSubscription(id: string) {
   revalidatePath("/calendar");
 }
 
+export async function updateSubscription(id: string, data: z.input<typeof subscriptionSchema>) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  const existing = await db.subscription.findFirst({
+    where: { id, userId: session.user.id },
+  });
+  if (!existing) throw new Error("Subscription not found");
+
+  const parsed = subscriptionSchema.parse(data);
+
+  await db.subscription.update({
+    where: { id },
+    data: {
+      name: parsed.name,
+      amount: parsed.amount,
+      currency: parsed.currency,
+      frequency: parsed.frequency,
+      nextBillingDate: parsed.nextBillingDate,
+      categoryId: parsed.categoryId || null,
+      url: parsed.url || null,
+      notes: parsed.notes || null,
+    },
+  });
+
+  revalidatePath("/subscriptions");
+  revalidatePath("/calendar");
+}
+
 export async function deleteSubscription(id: string) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");

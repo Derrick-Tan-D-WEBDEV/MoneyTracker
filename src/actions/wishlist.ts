@@ -77,6 +77,33 @@ export async function toggleWishlistItem(id: string) {
   revalidatePath("/wishlist");
 }
 
+export async function updateWishlistItem(id: string, data: z.input<typeof wishlistSchema>) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  const existing = await db.wishlistItem.findFirst({
+    where: { id, userId: session.user.id },
+  });
+  if (!existing) throw new Error("Not found");
+
+  const parsed = wishlistSchema.parse(data);
+
+  await db.wishlistItem.update({
+    where: { id },
+    data: {
+      name: parsed.name,
+      estimatedCost: parsed.estimatedCost,
+      currency: parsed.currency,
+      priority: parsed.priority,
+      targetDate: parsed.targetDate ? new Date(parsed.targetDate) : null,
+      url: parsed.url || null,
+      notes: parsed.notes || null,
+    },
+  });
+
+  revalidatePath("/wishlist");
+}
+
 export async function deleteWishlistItem(id: string) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");

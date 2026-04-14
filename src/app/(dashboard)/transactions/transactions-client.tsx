@@ -15,7 +15,7 @@ import { Plus, ArrowUpRight, ArrowDownRight, ArrowRightLeft, Trash2, Pencil, Fil
 import { usePartnerView } from "@/hooks/use-partner-view";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { CSVImportDialog } from "@/components/csv-import-dialog";
-import { getTransactions, createTransaction, deleteTransaction, checkTransactionAchievements } from "@/actions/transactions";
+import { getTransactions, createTransaction, updateTransaction, deleteTransaction, checkTransactionAchievements } from "@/actions/transactions";
 import { getTags, createTag, updateTransactionTags } from "@/actions/tags";
 import { getAccounts } from "@/actions/accounts";
 import { getCategories } from "@/actions/categories";
@@ -65,6 +65,7 @@ export function TransactionsClient() {
   const [rates, setRates] = useState<RateMap>({});
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [filterType, setFilterType] = useState("ALL");
   const [filterAccountId, setFilterAccountId] = useState("ALL");
@@ -115,6 +116,18 @@ export function TransactionsClient() {
     fetchData();
   }, [filterType, filterAccountId, filterCategoryId, filterStartDate, filterEndDate]);
 
+  const populateEditForm = (t: Transaction) => {
+    setEditingTransaction(t);
+    setFormType(t.type as "EXPENSE" | "INCOME" | "TRANSFER");
+    setFormAccountId(t.account.id);
+    setFormCategoryId(t.category?.id || "");
+    setFormAmount(String(t.amount));
+    setFormDescription(t.description);
+    setFormDate(t.date.split("T")[0]);
+    setFormNotes(t.notes || "");
+    setDialogOpen(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -133,23 +146,37 @@ export function TransactionsClient() {
 
     try {
       const txAmount = parseFloat(formAmount);
-      await createTransaction({
-        type: formType,
-        accountId: formAccountId,
-        categoryId: formType === "TRANSFER" ? null : formCategoryId || null,
-        amount: txAmount,
-        description: formDescription || (formType === "TRANSFER" ? "Transfer" : ""),
-        date: formDate,
-        notes: formNotes || null,
-        transferToAccountId: formType === "TRANSFER" ? formTransferToAccountId : null,
-      });
-      if (formType !== "TRANSFER") await checkTransactionAchievements({ type: formType, amount: txAmount });
-      toast.success("Transaction added");
+      if (editingTransaction) {
+        await updateTransaction(editingTransaction.id, {
+          type: formType,
+          accountId: formAccountId,
+          categoryId: formType === "TRANSFER" ? null : formCategoryId || null,
+          amount: txAmount,
+          description: formDescription || (formType === "TRANSFER" ? "Transfer" : ""),
+          date: formDate,
+          notes: formNotes || null,
+          transferToAccountId: formType === "TRANSFER" ? formTransferToAccountId : null,
+        });
+        toast.success("Transaction updated");
+      } else {
+        await createTransaction({
+          type: formType,
+          accountId: formAccountId,
+          categoryId: formType === "TRANSFER" ? null : formCategoryId || null,
+          amount: txAmount,
+          description: formDescription || (formType === "TRANSFER" ? "Transfer" : ""),
+          date: formDate,
+          notes: formNotes || null,
+          transferToAccountId: formType === "TRANSFER" ? formTransferToAccountId : null,
+        });
+        if (formType !== "TRANSFER") await checkTransactionAchievements({ type: formType, amount: txAmount });
+        toast.success("Transaction added");
+      }
       setDialogOpen(false);
       resetForm();
       fetchData();
     } catch (error) {
-      toast.error("Failed to add transaction");
+      toast.error(editingTransaction ? "Failed to update transaction" : "Failed to add transaction");
     }
   };
 
@@ -164,6 +191,7 @@ export function TransactionsClient() {
   };
 
   const resetForm = () => {
+    setEditingTransaction(null);
     setFormType("EXPENSE");
     setFormAccountId("");
     setFormTransferToAccountId("");
@@ -309,14 +337,20 @@ export function TransactionsClient() {
               <Upload className="w-4 h-4 mr-2" />
               Import CSV
             </Button>
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <Dialog
+              open={dialogOpen}
+              onOpenChange={(open) => {
+                setDialogOpen(open);
+                if (!open) resetForm();
+              }}
+            >
               <DialogTrigger render={<Button />}>
                 <Plus className="w-4 h-4 mr-2" />
                 Add Transaction
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Add Transaction</DialogTitle>
+                  <DialogTitle>{editingTransaction ? "Edit Transaction" : "Add Transaction"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="flex gap-2">
@@ -434,7 +468,7 @@ export function TransactionsClient() {
                   </div>
 
                   <Button type="submit" className="w-full">
-                    {formType === "TRANSFER" ? "Transfer" : `Add ${formType === "INCOME" ? "Income" : "Expense"}`}
+                    {editingTransaction ? "Save Changes" : formType === "TRANSFER" ? "Transfer" : `Add ${formType === "INCOME" ? "Income" : "Expense"}`}
                   </Button>
                 </form>
               </DialogContent>
@@ -655,6 +689,11 @@ export function TransactionsClient() {
                             )}
                           </PopoverContent>
                         </Popover>
+                        {!isPartnerView && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => populateEditForm(t)}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
                         {!isPartnerView && (
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(t.id)}>
                             <Trash2 className="w-3.5 h-3.5" />

@@ -10,9 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, TrendingUp, TrendingDown, Trash2 } from "lucide-react";
+import { Plus, TrendingUp, TrendingDown, Trash2, Pencil } from "lucide-react";
 import { usePartnerView } from "@/hooks/use-partner-view";
-import { getInvestments, createInvestment, deleteInvestment } from "@/actions/investments";
+import { getInvestments, createInvestment, updateInvestment, deleteInvestment } from "@/actions/investments";
 import { getExchangeRates as fetchExchangeRates } from "@/actions/exchange-rates";
 import { convertCurrency } from "@/lib/exchange-rates";
 import { PortfolioPieChart } from "@/components/charts/portfolio-pie-chart";
@@ -58,6 +58,7 @@ export function InvestmentsClient() {
   const [loading, setLoading] = useState(true);
   const [rates, setRates] = useState<Record<string, number>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
 
   const [formName, setFormName] = useState("");
   const [formSymbol, setFormSymbol] = useState("");
@@ -84,32 +85,57 @@ export function InvestmentsClient() {
     fetchData();
   }, []);
 
+  const populateEditForm = (inv: Investment) => {
+    setEditingInvestment(inv);
+    setFormName(inv.name);
+    setFormSymbol(inv.symbol || "");
+    setFormType(inv.type);
+    setFormCurrency(inv.currency);
+    setFormQuantity(String(inv.quantity));
+    setFormBuyPrice(String(inv.buyPrice));
+    setFormCurrentPrice(String(inv.currentPrice));
+    setFormBuyDate(inv.buyDate.split("T")[0]);
+    setDialogOpen(true);
+  };
+
+  const resetForm = () => {
+    setEditingInvestment(null);
+    setFormName("");
+    setFormSymbol("");
+    setFormQuantity("");
+    setFormBuyPrice("");
+    setFormCurrentPrice("");
+    setFormCurrency(userCurrency);
+    setFormBuyDate(new Date().toISOString().split("T")[0]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const payload = {
+      name: formName,
+      symbol: formSymbol || null,
+      type: formType as "STOCK" | "CRYPTO" | "MUTUAL_FUND" | "BOND" | "ETF" | "REAL_ESTATE" | "OTHER",
+      quantity: parseFloat(formQuantity),
+      buyPrice: parseFloat(formBuyPrice),
+      currentPrice: parseFloat(formCurrentPrice),
+      currency: formCurrency,
+      buyDate: formBuyDate,
+      accountId: null,
+      notes: null,
+    };
     try {
-      await createInvestment({
-        name: formName,
-        symbol: formSymbol || null,
-        type: formType as "STOCK" | "CRYPTO" | "MUTUAL_FUND" | "BOND" | "ETF" | "REAL_ESTATE" | "OTHER",
-        quantity: parseFloat(formQuantity),
-        buyPrice: parseFloat(formBuyPrice),
-        currentPrice: parseFloat(formCurrentPrice),
-        currency: formCurrency,
-        buyDate: formBuyDate,
-        accountId: null,
-        notes: null,
-      });
-      toast.success("Investment added");
+      if (editingInvestment) {
+        await updateInvestment(editingInvestment.id, payload);
+        toast.success("Investment updated");
+      } else {
+        await createInvestment(payload);
+        toast.success("Investment added");
+      }
       setDialogOpen(false);
-      setFormName("");
-      setFormSymbol("");
-      setFormQuantity("");
-      setFormBuyPrice("");
-      setFormCurrentPrice("");
-      setFormCurrency(userCurrency);
+      resetForm();
       fetchData();
     } catch {
-      toast.error("Failed to add investment");
+      toast.error(editingInvestment ? "Failed to update investment" : "Failed to add investment");
     }
   };
 
@@ -151,14 +177,20 @@ export function InvestmentsClient() {
           <p className="text-muted-foreground">Track your investment portfolio</p>
         </div>
         {!isPartnerView && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog
+            open={dialogOpen}
+            onOpenChange={(open) => {
+              setDialogOpen(open);
+              if (!open) resetForm();
+            }}
+          >
             <DialogTrigger render={<Button />}>
               <Plus className="w-4 h-4 mr-2" />
               Add Investment
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Add Investment</DialogTitle>
+                <DialogTitle>{editingInvestment ? "Edit Investment" : "Add Investment"}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
@@ -226,7 +258,7 @@ export function InvestmentsClient() {
                 </div>
 
                 <Button type="submit" className="w-full">
-                  Add Investment
+                  {editingInvestment ? "Save Changes" : "Add Investment"}
                 </Button>
               </form>
             </DialogContent>
@@ -344,9 +376,14 @@ export function InvestmentsClient() {
                       </TableCell>
                       <TableCell>
                         {!isPartnerView && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(inv.id)}>
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => populateEditForm(inv)}>
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(inv.id)}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
                         )}
                       </TableCell>
                     </TableRow>

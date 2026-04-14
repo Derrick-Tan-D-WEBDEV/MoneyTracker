@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, CalendarDays, Landmark, CreditCard, Repeat, Receipt } from "lucide-react";
 import { getBillCalendarData, type CalendarEvent } from "@/actions/calendar";
 import { currencyFormatter } from "@/lib/format";
+import { convertCurrency } from "@/lib/exchange-rates";
+import type { RateMap } from "@/lib/exchange-rates";
 import { useSession } from "next-auth/react";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -31,12 +33,18 @@ export function CalendarClient() {
   const [month, setMonth] = useState(new Date().getMonth());
   const [year, setYear] = useState(new Date().getFullYear());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [rates, setRates] = useState<RateMap>({});
+  const [serverCurrency, setServerCurrency] = useState<string>("SGD");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
     getBillCalendarData(month, year)
-      .then((data) => setEvents(data.events))
+      .then((data) => {
+        setEvents(data.events);
+        setRates(data.rates);
+        setServerCurrency(data.userCurrency);
+      })
       .finally(() => setLoading(false));
   }, [month, year]);
 
@@ -66,7 +74,9 @@ export function CalendarClient() {
     eventsByDay.get(day)!.push(event);
   }
 
-  const totalMonthly = events.reduce((s, e) => s + e.amount, 0);
+  const convertToUser = (amount: number, currency: string) =>
+    convertCurrency(amount, currency, serverCurrency, rates);
+  const totalMonthly = events.reduce((s, e) => s + convertToUser(e.amount, e.currency), 0);
   const upcomingEvents = events.filter((e) => {
     const d = new Date(e.date);
     return isCurrentMonth ? d.getDate() >= today.getDate() : true;
@@ -98,7 +108,7 @@ export function CalendarClient() {
         <Card>
           <CardContent className="pt-4">
             <p className="text-sm text-muted-foreground">Remaining Due</p>
-            <p className="text-2xl font-bold">{formatCurrency(upcomingEvents.reduce((s, e) => s + e.amount, 0))}</p>
+            <p className="text-2xl font-bold">{formatCurrency(upcomingEvents.reduce((s, e) => s + convertToUser(e.amount, e.currency), 0))}</p>
           </CardContent>
         </Card>
       </div>

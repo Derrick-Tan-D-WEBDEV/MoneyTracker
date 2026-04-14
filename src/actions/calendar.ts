@@ -112,5 +112,9 @@ export async function getBillCalendarData(month?: number, year?: number) {
   // Sort by date
   events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  return { events, month: targetMonth, year: targetYear };
+  // Fetch exchange rates for currency conversion in totals
+  const userCurrency = session.user.currency || "SGD";
+  const rates = await getExchangeRates(userCurrency);
+
+  return { events, month: targetMonth, year: targetYear, userCurrency, rates };
 }

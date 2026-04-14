@@ -15,6 +15,8 @@ import { usePartnerView } from "@/hooks/use-partner-view";
 import { getGoals, createGoal, updateGoal, addContribution, deleteGoal } from "@/actions/goals";
 import { SUPPORTED_CURRENCIES } from "@/lib/constants";
 import { getAccounts } from "@/actions/accounts";
+import { getExchangeRates as fetchExchangeRates } from "@/actions/exchange-rates";
+import { convertCurrency } from "@/lib/exchange-rates";
 import { toast } from "sonner";
 import { currencyFormatter } from "@/lib/format";
 import { useSession } from "next-auth/react";
@@ -68,6 +70,7 @@ export function GoalsClient() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
+  const [rates, setRates] = useState<Record<string, number>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [contributeId, setContributeId] = useState<string | null>(null);
@@ -89,8 +92,9 @@ export function GoalsClient() {
 
   const fetchGoals = async () => {
     try {
-      const data = await getGoals();
+      const [data, rateData] = await Promise.all([getGoals(), fetchExchangeRates(userCurrency)]);
       setGoals(data);
+      setRates(rateData);
     } catch {
       toast.error("Failed to load goals");
     } finally {
@@ -199,8 +203,9 @@ export function GoalsClient() {
     }
   };
 
-  const totalTarget = goals.reduce((s, g) => s + g.targetAmount, 0);
-  const totalSaved = goals.reduce((s, g) => s + g.currentAmount, 0);
+  const toUser = (amount: number, from: string) => convertCurrency(amount, from, userCurrency, rates);
+  const totalTarget = goals.reduce((s, g) => s + toUser(g.targetAmount, g.currency || userCurrency), 0);
+  const totalSaved = goals.reduce((s, g) => s + toUser(g.currentAmount, g.currency || userCurrency), 0);
   const defaultFormat = currencyFormatter(userCurrency);
 
   // Helper: format in goal's own currency

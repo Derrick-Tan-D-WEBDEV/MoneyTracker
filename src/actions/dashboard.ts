@@ -24,7 +24,12 @@ export async function getDashboardData() {
     where: { userId, isArchived: false },
   });
 
-  const totalBalance = accounts.reduce((sum, acc) => {
+  // Get active debts for net worth
+  const debts = await db.debt.findMany({
+    where: { userId, isPaidOff: false },
+  });
+
+  const accountBalance = accounts.reduce((sum, acc) => {
     const converted = toUser(Number(acc.balance), acc.currency);
     if (acc.type === "CREDIT_CARD") {
       // Balance = available credit; liability = creditLimit - balance
@@ -33,6 +38,12 @@ export async function getDashboardData() {
     }
     return sum + converted;
   }, 0);
+
+  const totalDebt = debts.reduce((sum, d) => {
+    return sum + toUser(Number(d.remainingAmount), d.currency);
+  }, 0);
+
+  const totalBalance = accountBalance - totalDebt;
 
   // Auto-record daily net worth snapshot (only for own data, not partner view)
   if (!(await isPartnerView())) {
@@ -105,13 +116,14 @@ export async function getDashboardData() {
   const budgetProgress = await Promise.all(
     budgets.map(async (budget) => {
       const spent = currentMonthTransactions.filter((t) => t.type === "EXPENSE" && t.categoryId === budget.categoryId).reduce((sum, t) => sum + toUser(Number(t.amount), t.account.currency), 0);
+      const limit = toUser(Number(budget.amount), budget.currency || userCurrency);
       return {
         id: budget.id,
         category: budget.category.name,
         categoryColor: budget.category.color,
-        limit: Number(budget.amount),
+        limit,
         spent,
-        percentage: Number(budget.amount) > 0 ? (spent / Number(budget.amount)) * 100 : 0,
+        percentage: limit > 0 ? (spent / limit) * 100 : 0,
       };
     }),
   );
@@ -142,16 +154,21 @@ export async function getDashboardData() {
     take: 5,
   });
 
-  const goalsData = goals.map((g) => ({
-    id: g.id,
-    name: g.name,
-    targetAmount: Number(g.targetAmount),
-    currentAmount: Number(g.currentAmount),
-    type: g.type,
-    deadline: g.deadline?.toISOString() || null,
-    color: g.color,
-    percentage: Number(g.targetAmount) > 0 ? (Number(g.currentAmount) / Number(g.targetAmount)) * 100 : 0,
-  }));
+  const goalsData = goals.map((g) => {
+    const goalCurrency = g.currency || userCurrency;
+    const targetAmount = toUser(Number(g.targetAmount), goalCurrency);
+    const currentAmount = toUser(Number(g.currentAmount), goalCurrency);
+    return {
+      id: g.id,
+      name: g.name,
+      targetAmount,
+      currentAmount,
+      type: g.type,
+      deadline: g.deadline?.toISOString() || null,
+      color: g.color,
+      percentage: targetAmount > 0 ? (currentAmount / targetAmount) * 100 : 0,
+    };
+  });
 
   // Monthly trend (last 12 months)
   const monthlyTrend = [];
@@ -182,14 +199,14 @@ export async function getDashboardData() {
     });
   }
 
-  // Debts
-  const debts = await db.debt.findMany({
+  // Debts (all, for dashboard section)
+  const allDebts = await db.debt.findMany({
     where: { userId },
   });
 
-  const totalDebt = debts.reduce((sum, d) => sum + toUser(Number(d.remainingAmount), d.currency), 0);
-  const totalDebtPaid = debts.reduce((sum, d) => sum + toUser(Number(d.originalAmount) - Number(d.remainingAmount), d.currency), 0);
-  const activeDebts = debts.filter((d) => Number(d.remainingAmount) > 0);
+  const totalDebtAll = allDebts.reduce((sum, d) => sum + toUser(Number(d.remainingAmount), d.currency), 0);
+  const totalDebtPaid = allDebts.reduce((sum, d) => sum + toUser(Number(d.originalAmount) - Number(d.remainingAmount), d.currency), 0);
+  const activeDebts = allDebts.filter((d) => Number(d.remainingAmount) > 0);
 
   // Installments
   const installments = await db.installment.findMany({
@@ -252,7 +269,7 @@ export async function getDashboardData() {
       color: a.color,
     })),
     debts: {
-      totalDebt,
+      totalDebt: totalDebtAll,
       totalDebtPaid,
       activeCount: activeDebts.length,
       items: activeDebts.slice(0, 3).map((d) => ({

@@ -9,9 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Trash2, Repeat, ExternalLink, CreditCard } from "lucide-react";
+import { Plus, Trash2, Repeat, ExternalLink, CreditCard, Pencil } from "lucide-react";
 import { usePartnerView } from "@/hooks/use-partner-view";
-import { getSubscriptions, createSubscription, toggleSubscription, deleteSubscription } from "@/actions/subscriptions";
+import { getSubscriptions, createSubscription, updateSubscription, toggleSubscription, deleteSubscription } from "@/actions/subscriptions";
 import { getCategories } from "@/actions/categories";
 import { currencyFormatter } from "@/lib/format";
 import { SUPPORTED_CURRENCIES } from "@/lib/constants";
@@ -45,6 +45,7 @@ export function SubscriptionsClient() {
   const [categories, setCategories] = useState<{ id: string; name: string; type: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
 
   // Form state
   const [name, setName] = useState("");
@@ -72,29 +73,8 @@ export function SubscriptionsClient() {
     fetchData();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await createSubscription({
-        name,
-        amount: parseFloat(amount),
-        currency,
-        frequency: frequency as "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY",
-        nextBillingDate,
-        categoryId: categoryId || null,
-        url: url || null,
-        notes: notes || null,
-      });
-      toast.success("Subscription added");
-      setDialogOpen(false);
-      resetForm();
-      fetchData();
-    } catch {
-      toast.error("Failed to add subscription");
-    }
-  };
-
   const resetForm = () => {
+    setEditingSubscription(null);
     setName("");
     setAmount("");
     setCurrency(userCurrency);
@@ -103,6 +83,47 @@ export function SubscriptionsClient() {
     setCategoryId("");
     setUrl("");
     setNotes("");
+  };
+
+  const populateEditForm = (sub: Subscription) => {
+    setEditingSubscription(sub);
+    setName(sub.name);
+    setAmount(String(sub.amount));
+    setCurrency(sub.currency);
+    setFrequency(sub.frequency);
+    setNextBillingDate(sub.nextBillingDate.split("T")[0]);
+    setCategoryId(sub.category?.id || "");
+    setUrl(sub.url || "");
+    setNotes(sub.notes || "");
+    setDialogOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const payload = {
+      name,
+      amount: parseFloat(amount),
+      currency,
+      frequency: frequency as "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY",
+      nextBillingDate,
+      categoryId: categoryId || null,
+      url: url || null,
+      notes: notes || null,
+    };
+    try {
+      if (editingSubscription) {
+        await updateSubscription(editingSubscription.id, payload);
+        toast.success("Subscription updated");
+      } else {
+        await createSubscription(payload);
+        toast.success("Subscription added");
+      }
+      setDialogOpen(false);
+      resetForm();
+      fetchData();
+    } catch {
+      toast.error(editingSubscription ? "Failed to update subscription" : "Failed to add subscription");
+    }
   };
 
   const handleToggle = async (id: string) => {
@@ -147,13 +168,19 @@ export function SubscriptionsClient() {
           <p className="text-muted-foreground">Track your recurring subscriptions and services</p>
         </div>
         {!isPartnerView && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog
+            open={dialogOpen}
+            onOpenChange={(open) => {
+              setDialogOpen(open);
+              if (!open) resetForm();
+            }}
+          >
             <DialogTrigger render={<Button />}>
               <Plus className="w-4 h-4 mr-2" /> Add Subscription
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Add Subscription</DialogTitle>
+                <DialogTitle>{editingSubscription ? "Edit Subscription" : "Add Subscription"}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
@@ -225,7 +252,7 @@ export function SubscriptionsClient() {
                   <Input placeholder="Add a note..." value={notes} onChange={(e) => setNotes(e.target.value)} />
                 </div>
                 <Button type="submit" className="w-full">
-                  Add Subscription
+                  {editingSubscription ? "Save Changes" : "Add Subscription"}
                 </Button>
               </form>
             </DialogContent>
@@ -297,6 +324,11 @@ export function SubscriptionsClient() {
                     </div>
                   </div>
                   <p className="text-sm font-bold tabular-nums">{currencyFormatter(sub.currency)(sub.amount)}</p>
+                  {!isPartnerView && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => populateEditForm(sub)}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                  )}
                   {!isPartnerView && <Switch checked={sub.isActive} onCheckedChange={() => handleToggle(sub.id)} />}
                   {!isPartnerView && (
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(sub.id)}>
@@ -330,6 +362,11 @@ export function SubscriptionsClient() {
                     </Badge>
                   </div>
                   <p className="text-sm font-bold tabular-nums">{currencyFormatter(sub.currency)(sub.amount)}</p>
+                  {!isPartnerView && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => populateEditForm(sub)}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                  )}
                   {!isPartnerView && <Switch checked={sub.isActive} onCheckedChange={() => handleToggle(sub.id)} />}
                   {!isPartnerView && (
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(sub.id)}>

@@ -9,10 +9,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Star, Trash2, ExternalLink, ShoppingBag, Check } from "lucide-react";
+import { Plus, Star, Trash2, ExternalLink, ShoppingBag, Check, Pencil } from "lucide-react";
 import { usePartnerView } from "@/hooks/use-partner-view";
-import { getWishlistItems, createWishlistItem, toggleWishlistItem, deleteWishlistItem } from "@/actions/wishlist";
+import { getWishlistItems, createWishlistItem, updateWishlistItem, toggleWishlistItem, deleteWishlistItem } from "@/actions/wishlist";
 import { currencyFormatter } from "@/lib/format";
+import { getExchangeRates as fetchExchangeRates } from "@/actions/exchange-rates";
+import { convertCurrency } from "@/lib/exchange-rates";
 import { SUPPORTED_CURRENCIES } from "@/lib/constants";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
@@ -47,7 +49,9 @@ export function WishlistClient() {
 
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [rates, setRates] = useState<Record<string, number>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<WishlistItem | null>(null);
 
   const [name, setName] = useState("");
   const [estimatedCost, setEstimatedCost] = useState("");
@@ -59,8 +63,9 @@ export function WishlistClient() {
 
   const fetchData = async () => {
     try {
-      const data = await getWishlistItems();
+      const [data, rateData] = await Promise.all([getWishlistItems(), fetchExchangeRates(userCurrency)]);
       setItems(data);
+      setRates(rateData);
     } catch {
       toast.error("Failed to load wishlist");
     } finally {
@@ -72,29 +77,53 @@ export function WishlistClient() {
     fetchData();
   }, []);
 
+  const resetForm = () => {
+    setEditingItem(null);
+    setName("");
+    setEstimatedCost("");
+    setCurrency(userCurrency);
+    setPriority("3");
+    setTargetDate("");
+    setUrl("");
+    setNotes("");
+  };
+
+  const populateEditForm = (item: WishlistItem) => {
+    setEditingItem(item);
+    setName(item.name);
+    setEstimatedCost(String(item.estimatedCost));
+    setCurrency(item.currency);
+    setPriority(String(item.priority));
+    setTargetDate(item.targetDate ? item.targetDate.split("T")[0] : "");
+    setUrl(item.url || "");
+    setNotes(item.notes || "");
+    setDialogOpen(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const payload = {
+      name,
+      estimatedCost: parseFloat(estimatedCost),
+      currency,
+      priority: parseInt(priority),
+      targetDate: targetDate || null,
+      url: url || null,
+      notes: notes || null,
+    };
     try {
-      await createWishlistItem({
-        name,
-        estimatedCost: parseFloat(estimatedCost),
-        currency,
-        priority: parseInt(priority),
-        targetDate: targetDate || null,
-        url: url || null,
-        notes: notes || null,
-      });
-      toast.success("Item added to wishlist");
+      if (editingItem) {
+        await updateWishlistItem(editingItem.id, payload);
+        toast.success("Item updated");
+      } else {
+        await createWishlistItem(payload);
+        toast.success("Item added to wishlist");
+      }
       setDialogOpen(false);
-      setName("");
-      setEstimatedCost("");
-      setPriority("3");
-      setTargetDate("");
-      setUrl("");
-      setNotes("");
+      resetForm();
       fetchData();
     } catch {
-      toast.error("Failed to add item");
+      toast.error(editingItem ? "Failed to update item" : "Failed to add item");
     }
   };
 
@@ -119,7 +148,8 @@ export function WishlistClient() {
 
   const activeItems = items.filter((i) => !i.isPurchased);
   const purchasedItems = items.filter((i) => i.isPurchased);
-  const totalCost = activeItems.reduce((s, i) => s + i.estimatedCost, 0);
+  const toUser = (amount: number, from: string) => convertCurrency(amount, from, userCurrency, rates);
+  const totalCost = activeItems.reduce((s, i) => s + toUser(i.estimatedCost, i.currency), 0);
 
   return (
     <div className="space-y-6">
@@ -129,14 +159,20 @@ export function WishlistClient() {
           <p className="text-muted-foreground">Track planned purchases and savings goals</p>
         </div>
         {!isPartnerView && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog
+            open={dialogOpen}
+            onOpenChange={(open) => {
+              setDialogOpen(open);
+              if (!open) resetForm();
+            }}
+          >
             <DialogTrigger render={<Button />}>
               <Plus className="w-4 h-4 mr-2" />
               Add Item
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Add to Wishlist</DialogTitle>
+                <DialogTitle>{editingItem ? "Edit Wishlist Item" : "Add to Wishlist"}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
@@ -199,7 +235,7 @@ export function WishlistClient() {
                 </div>
 
                 <Button type="submit" className="w-full">
-                  Add to Wishlist
+                  {editingItem ? "Save Changes" : "Add to Wishlist"}
                 </Button>
               </form>
             </DialogContent>
@@ -285,14 +321,24 @@ export function WishlistClient() {
                         </div>
                       </div>
                       {!isPartnerView && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 shrink-0"
-                          onClick={() => handleDelete(item.id)}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-foreground"
+                            onClick={() => populateEditForm(item)}
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500"
+                            onClick={() => handleDelete(item.id)}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </CardContent>
