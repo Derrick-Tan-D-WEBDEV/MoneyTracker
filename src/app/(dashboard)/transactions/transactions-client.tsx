@@ -249,190 +249,198 @@ export function TransactionsClient() {
           <h1 className="text-2xl font-bold text-foreground">Transactions</h1>
           <p className="text-muted-foreground">Manage your income and expenses</p>
         </div>
-        {!isPartnerView && <div className="flex items-center gap-2">
-          <Popover open={tagDialogOpen} onOpenChange={setTagDialogOpen}>
-            <PopoverTrigger render={<Button variant="outline" />}>
-              <Tag className="w-4 h-4 mr-2" />
-              Tags
-            </PopoverTrigger>
-            <PopoverContent side="bottom" align="end" className="w-64 p-3">
-              <p className="text-sm font-medium mb-2">Manage Tags</p>
-              <div className="space-y-2 mb-3">
-                {tags.map((tag) => (
-                  <div key={tag.id} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
-                      {tag.name}
+        {!isPartnerView && (
+          <div className="flex items-center gap-2">
+            <Popover open={tagDialogOpen} onOpenChange={setTagDialogOpen}>
+              <PopoverTrigger render={<Button variant="outline" />}>
+                <Tag className="w-4 h-4 mr-2" />
+                Tags
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="end" className="w-64 p-3">
+                <p className="text-sm font-medium mb-2">Manage Tags</p>
+                <div className="space-y-2 mb-3">
+                  {tags.map((tag) => (
+                    <div key={tag.id} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
+                        {tag.name}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-muted-foreground hover:text-red-500"
+                        onClick={async () => {
+                          const { deleteTag } = await import("@/actions/tags");
+                          await deleteTag(tag.id);
+                          fetchData();
+                        }}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-muted-foreground hover:text-red-500"
-                      onClick={async () => {
-                        const { deleteTag } = await import("@/actions/tags");
-                        await deleteTag(tag.id);
-                        fetchData();
-                      }}
-                    >
-                      <X className="w-3 h-3" />
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="New tag..."
+                    value={newTagName}
+                    onChange={(e) => setNewTagName(e.target.value)}
+                    className="h-8 text-sm"
+                    onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
+                  />
+                  <input type="color" value={newTagColor} onChange={(e) => setNewTagColor(e.target.value)} className="w-8 h-8 rounded cursor-pointer border-0 p-0" />
+                  <Button size="sm" className="h-8" onClick={handleCreateTag}>
+                    <Plus className="w-3 h-3" />
+                  </Button>
+                </div>
+                <div className="flex gap-1 mt-2">
+                  {TAG_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      className={`w-5 h-5 rounded-full border-2 ${newTagColor === c ? "border-foreground" : "border-transparent"}`}
+                      style={{ backgroundColor: c }}
+                      onClick={() => setNewTagColor(c)}
+                    />
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
+              <Upload className="w-4 h-4 mr-2" />
+              Import CSV
+            </Button>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger render={<Button />}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Transaction
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Transaction</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="flex gap-2">
+                    <Button type="button" variant={formType === "EXPENSE" ? "default" : "outline"} className="flex-1" onClick={() => setFormType("EXPENSE")}>
+                      Expense
+                    </Button>
+                    <Button type="button" variant={formType === "INCOME" ? "default" : "outline"} className="flex-1" onClick={() => setFormType("INCOME")}>
+                      Income
+                    </Button>
+                    <Button type="button" variant={formType === "TRANSFER" ? "default" : "outline"} className="flex-1" onClick={() => setFormType("TRANSFER")}>
+                      Transfer
                     </Button>
                   </div>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <Input placeholder="New tag..." value={newTagName} onChange={(e) => setNewTagName(e.target.value)} className="h-8 text-sm" onKeyDown={(e) => e.key === "Enter" && handleCreateTag()} />
-                <input type="color" value={newTagColor} onChange={(e) => setNewTagColor(e.target.value)} className="w-8 h-8 rounded cursor-pointer border-0 p-0" />
-                <Button size="sm" className="h-8" onClick={handleCreateTag}>
-                  <Plus className="w-3 h-3" />
-                </Button>
-              </div>
-              <div className="flex gap-1 mt-2">
-                {TAG_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    className={`w-5 h-5 rounded-full border-2 ${newTagColor === c ? "border-foreground" : "border-transparent"}`}
-                    style={{ backgroundColor: c }}
-                    onClick={() => setNewTagColor(c)}
-                  />
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-          <Button variant="outline" onClick={() => setImportOpen(true)}>
-            <Upload className="w-4 h-4 mr-2" />
-            Import CSV
-          </Button>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger render={<Button />}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Transaction
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Transaction</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="flex gap-2">
-                  <Button type="button" variant={formType === "EXPENSE" ? "default" : "outline"} className="flex-1" onClick={() => setFormType("EXPENSE")}>
-                    Expense
-                  </Button>
-                  <Button type="button" variant={formType === "INCOME" ? "default" : "outline"} className="flex-1" onClick={() => setFormType("INCOME")}>
-                    Income
-                  </Button>
-                  <Button type="button" variant={formType === "TRANSFER" ? "default" : "outline"} className="flex-1" onClick={() => setFormType("TRANSFER")}>
-                    Transfer
-                  </Button>
-                </div>
 
-                <div className="space-y-2">
-                  <Label>Amount</Label>
-                  <Input type="number" placeholder="0.00" step="0.01" min="0.01" value={formAmount} onChange={(e) => setFormAmount(e.target.value)} required />
-                </div>
+                  <div className="space-y-2">
+                    <Label>Amount</Label>
+                    <Input type="number" placeholder="0.00" step="0.01" min="0.01" value={formAmount} onChange={(e) => setFormAmount(e.target.value)} required />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label>{formType === "TRANSFER" ? "Transfer Description (optional)" : "Description"}</Label>
-                  <Input
-                    placeholder={formType === "TRANSFER" ? "e.g., Savings transfer" : "e.g., Grocery shopping"}
-                    value={formDescription}
-                    onChange={(e) => setFormDescription(e.target.value)}
-                    required={formType !== "TRANSFER"}
-                  />
-                </div>
+                  <div className="space-y-2">
+                    <Label>{formType === "TRANSFER" ? "Transfer Description (optional)" : "Description"}</Label>
+                    <Input
+                      placeholder={formType === "TRANSFER" ? "e.g., Savings transfer" : "e.g., Grocery shopping"}
+                      value={formDescription}
+                      onChange={(e) => setFormDescription(e.target.value)}
+                      required={formType !== "TRANSFER"}
+                    />
+                  </div>
 
-                {formType === "TRANSFER" ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label>From Account</Label>
-                      <Select value={formAccountId} onValueChange={(v) => v && setFormAccountId(v)}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue>{(value: string) => accounts.find((a) => a.id === value)?.name || "Select..."}</SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {accounts.map((a) => (
-                            <SelectItem key={a.id} value={a.id}>
-                              {a.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>To Account</Label>
-                      <Select value={formTransferToAccountId} onValueChange={(v) => v && setFormTransferToAccountId(v)}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue>{(value: string) => accounts.find((a) => a.id === value)?.name || "Select..."}</SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {accounts
-                            .filter((a) => a.id !== formAccountId)
-                            .map((a) => (
+                  {formType === "TRANSFER" ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>From Account</Label>
+                        <Select value={formAccountId} onValueChange={(v) => v && setFormAccountId(v)}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue>{(value: string) => accounts.find((a) => a.id === value)?.name || "Select..."}</SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {accounts.map((a) => (
                               <SelectItem key={a.id} value={a.id}>
                                 {a.name}
                               </SelectItem>
                             ))}
-                        </SelectContent>
-                      </Select>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>To Account</Label>
+                        <Select value={formTransferToAccountId} onValueChange={(v) => v && setFormTransferToAccountId(v)}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue>{(value: string) => accounts.find((a) => a.id === value)?.name || "Select..."}</SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {accounts
+                              .filter((a) => a.id !== formAccountId)
+                              .map((a) => (
+                                <SelectItem key={a.id} value={a.id}>
+                                  {a.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label>Account</Label>
-                      <Select value={formAccountId} onValueChange={(v) => v && setFormAccountId(v)}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue>{(value: string) => accounts.find((a) => a.id === value)?.name || "Select..."}</SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {accounts.map((a) => (
-                            <SelectItem key={a.id} value={a.id}>
-                              {a.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Category</Label>
-                      <Select value={formCategoryId} onValueChange={(v) => v && setFormCategoryId(v)}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue>{(value: string) => filteredCategories.find((c) => c.id === value)?.name || "Select..."}</SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {filteredCategories.map((c) => {
-                            const CIcon = getCategoryIcon(c.icon);
-                            return (
-                              <SelectItem key={c.id} value={c.id}>
-                                <span className="flex items-center gap-2">
-                                  <CIcon className="w-3.5 h-3.5 shrink-0" style={{ color: c.color }} />
-                                  {c.name}
-                                </span>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>Account</Label>
+                        <Select value={formAccountId} onValueChange={(v) => v && setFormAccountId(v)}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue>{(value: string) => accounts.find((a) => a.id === value)?.name || "Select..."}</SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {accounts.map((a) => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.name}
                               </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Category</Label>
+                        <Select value={formCategoryId} onValueChange={(v) => v && setFormCategoryId(v)}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue>{(value: string) => filteredCategories.find((c) => c.id === value)?.name || "Select..."}</SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {filteredCategories.map((c) => {
+                              const CIcon = getCategoryIcon(c.icon);
+                              return (
+                                <SelectItem key={c.id} value={c.id}>
+                                  <span className="flex items-center gap-2">
+                                    <CIcon className="w-3.5 h-3.5 shrink-0" style={{ color: c.color }} />
+                                    {c.name}
+                                  </span>
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label>Date</Label>
+                    <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} required />
                   </div>
-                )}
 
-                <div className="space-y-2">
-                  <Label>Date</Label>
-                  <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} required />
-                </div>
+                  <div className="space-y-2">
+                    <Label>Notes (optional)</Label>
+                    <Input placeholder="Add a note..." value={formNotes} onChange={(e) => setFormNotes(e.target.value)} />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label>Notes (optional)</Label>
-                  <Input placeholder="Add a note..." value={formNotes} onChange={(e) => setFormNotes(e.target.value)} />
-                </div>
-
-                <Button type="submit" className="w-full">
-                  {formType === "TRANSFER" ? "Transfer" : `Add ${formType === "INCOME" ? "Income" : "Expense"}`}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>}
+                  <Button type="submit" className="w-full">
+                    {formType === "TRANSFER" ? "Transfer" : `Add ${formType === "INCOME" ? "Income" : "Expense"}`}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        )}
         <CSVImportDialog open={importOpen} onOpenChange={setImportOpen} accounts={accounts} onImported={fetchData} />
       </div>
 
@@ -647,9 +655,11 @@ export function TransactionsClient() {
                             )}
                           </PopoverContent>
                         </Popover>
-                        {!isPartnerView && <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(t.id)}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>}
+                        {!isPartnerView && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(t.id)}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

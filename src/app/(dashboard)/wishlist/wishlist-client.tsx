@@ -128,81 +128,83 @@ export function WishlistClient() {
           <h1 className="text-2xl font-bold text-foreground">Wishlist</h1>
           <p className="text-muted-foreground">Track planned purchases and savings goals</p>
         </div>
-        {!isPartnerView && <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger render={<Button />}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Item
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add to Wishlist</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. New laptop" required />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+        {!isPartnerView && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger render={<Button />}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Item
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add to Wishlist</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Estimated Cost</Label>
-                  <Input type="number" step="0.01" min="0.01" value={estimatedCost} onChange={(e) => setEstimatedCost(e.target.value)} placeholder="1000" required />
+                  <Label>Name</Label>
+                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. New laptop" required />
                 </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Estimated Cost</Label>
+                    <Input type="number" step="0.01" min="0.01" value={estimatedCost} onChange={(e) => setEstimatedCost(e.target.value)} placeholder="1000" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Currency</Label>
+                    <Select value={currency} onValueChange={(v) => v && setCurrency(v)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPPORTED_CURRENCIES.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Priority</Label>
+                    <Select value={priority} onValueChange={(v) => v && setPriority(v)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4, 5].map((p) => (
+                          <SelectItem key={p} value={String(p)}>
+                            {p} - {PRIORITY_LABELS[p]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Target Date</Label>
+                    <Input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label>Currency</Label>
-                  <Select value={currency} onValueChange={(v) => v && setCurrency(v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SUPPORTED_CURRENCIES.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>URL (optional)</Label>
+                  <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://..." />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>Priority</Label>
-                  <Select value={priority} onValueChange={(v) => v && setPriority(v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 3, 4, 5].map((p) => (
-                        <SelectItem key={p} value={String(p)}>
-                          {p} - {PRIORITY_LABELS[p]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Notes (optional)</Label>
+                  <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any details..." />
                 </div>
-                <div className="space-y-2">
-                  <Label>Target Date</Label>
-                  <Input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label>URL (optional)</Label>
-                <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://..." />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Notes (optional)</Label>
-                <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any details..." />
-              </div>
-
-              <Button type="submit" className="w-full">
-                Add to Wishlist
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>}
+                <Button type="submit" className="w-full">
+                  Add to Wishlist
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Summary */}
@@ -282,14 +284,16 @@ export function WishlistClient() {
                           {item.notes && <p className="text-xs text-muted-foreground mt-1">{item.notes}</p>}
                         </div>
                       </div>
-                      {!isPartnerView && <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 shrink-0"
-                        onClick={() => handleDelete(item.id)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>}
+                      {!isPartnerView && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 shrink-0"
+                          onClick={() => handleDelete(item.id)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -315,14 +319,16 @@ export function WishlistClient() {
                           </div>
                         </div>
                       </div>
-                      {!isPartnerView && <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 shrink-0"
-                        onClick={() => handleDelete(item.id)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>}
+                      {!isPartnerView && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 shrink-0"
+                          onClick={() => handleDelete(item.id)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

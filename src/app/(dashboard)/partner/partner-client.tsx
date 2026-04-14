@@ -5,17 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import {
-  Heart,
-  Wallet,
-  TrendingUp,
-  TrendingDown,
-  PiggyBank,
-  Target,
-  Landmark,
-  ArrowRight,
-  Settings,
-} from "lucide-react";
+import { Heart, Wallet, TrendingUp, TrendingDown, PiggyBank, Target, Landmark, ArrowRight, Settings } from "lucide-react";
 import Link from "next/link";
 import { currencyFormatter } from "@/lib/format";
 
@@ -49,13 +39,7 @@ type CoupleLink = {
   acceptedAt: string | null;
 } | null;
 
-export function PartnerDashboardClient({
-  coupleLink,
-  partnerData,
-}: {
-  coupleLink: CoupleLink;
-  partnerData: PartnerData | null;
-}) {
+export function PartnerDashboardClient({ coupleLink, partnerData }: { coupleLink: CoupleLink; partnerData: PartnerData | null }) {
   if (!coupleLink || coupleLink.status !== "ACCEPTED" || !partnerData) {
     return (
       <div className="space-y-4 max-w-2xl mx-auto">
@@ -70,9 +54,7 @@ export function PartnerDashboardClient({
           <CardContent className="py-12 text-center space-y-4">
             <Heart className="w-12 h-12 text-muted-foreground/30 mx-auto" />
             <h3 className="text-lg font-semibold">No Partner Linked</h3>
-            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-              Link with your partner in Settings to see each other&apos;s financial overview.
-            </p>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto">Link with your partner in Settings to see each other&apos;s financial overview.</p>
             <Link href="/settings">
               <Button variant="outline" className="gap-2 mt-2">
                 <Settings className="w-4 h-4" />
@@ -94,9 +76,7 @@ export function PartnerDashboardClient({
       <div className="flex items-center gap-3">
         <Avatar className="w-10 h-10">
           <AvatarImage src={partner.image || ""} />
-          <AvatarFallback className="bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-400 font-semibold">
-            {partner.name?.[0]?.toUpperCase() || "P"}
-          </AvatarFallback>
+          <AvatarFallback className="bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-400 font-semibold">{partner.name?.[0]?.toUpperCase() || "P"}</AvatarFallback>
         </Avatar>
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
@@ -142,9 +122,7 @@ export function PartnerDashboardClient({
               <PiggyBank className="w-3.5 h-3.5 text-blue-500" />
               Savings (Month)
             </div>
-            <p className={`text-lg font-bold ${currentMonth.savings >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-              {fmt(currentMonth.savings)}
-            </p>
+            <p className={`text-lg font-bold ${currentMonth.savings >= 0 ? "text-emerald-600" : "text-red-600"}`}>{fmt(currentMonth.savings)}</p>
           </CardContent>
         </Card>
       </div>
@@ -198,11 +176,7 @@ export function PartnerDashboardClient({
                       {tx.category} · {new Date(tx.date).toLocaleDateString()}
                     </p>
                   </div>
-                  <span
-                    className={`text-sm font-medium shrink-0 ml-2 ${
-                      tx.type === "INCOME" ? "text-emerald-600" : tx.type === "EXPENSE" ? "text-red-600" : "text-blue-600"
-                    }`}
-                  >
+                  <span className={`text-sm font-medium shrink-0 ml-2 ${tx.type === "INCOME" ? "text-emerald-600" : tx.type === "EXPENSE" ? "text-red-600" : "text-blue-600"}`}>
                     {tx.type === "INCOME" ? "+" : tx.type === "EXPENSE" ? "-" : ""}
                     {fmt(tx.amount)}
                   </span>
@@ -260,10 +234,7 @@ export function PartnerDashboardClient({
               <p className="text-sm text-muted-foreground">No active debts 🎉</p>
             ) : (
               debts.map((debt) => {
-                const progress =
-                  debt.originalAmount > 0
-                    ? ((debt.originalAmount - debt.remainingAmount) / debt.originalAmount) * 100
-                    : 0;
+                const progress = debt.originalAmount > 0 ? ((debt.originalAmount - debt.remainingAmount) / debt.originalAmount) * 100 : 0;
                 return (
                   <div key={debt.id} className="space-y-1">
                     <div className="flex items-center justify-between">

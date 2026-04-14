@@ -146,89 +146,91 @@ export function SubscriptionsClient() {
           <h1 className="text-2xl font-bold text-foreground">Subscriptions</h1>
           <p className="text-muted-foreground">Track your recurring subscriptions and services</p>
         </div>
-        {!isPartnerView && <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger render={<Button />}>
-            <Plus className="w-4 h-4 mr-2" /> Add Subscription
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Subscription</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input placeholder="e.g., Netflix, Spotify" value={name} onChange={(e) => setName(e.target.value)} required />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+        {!isPartnerView && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger render={<Button />}>
+              <Plus className="w-4 h-4 mr-2" /> Add Subscription
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Subscription</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Amount</Label>
-                  <Input type="number" step="0.01" min="0.01" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+                  <Label>Name</Label>
+                  <Input placeholder="e.g., Netflix, Spotify" value={name} onChange={(e) => setName(e.target.value)} required />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Amount</Label>
+                    <Input type="number" step="0.01" min="0.01" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Currency</Label>
+                    <Select value={currency} onValueChange={(v) => v && setCurrency(v)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPPORTED_CURRENCIES.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Frequency</Label>
+                    <Select value={frequency} onValueChange={(v) => v && setFrequency(v)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="DAILY">Daily</SelectItem>
+                        <SelectItem value="WEEKLY">Weekly</SelectItem>
+                        <SelectItem value="MONTHLY">Monthly</SelectItem>
+                        <SelectItem value="YEARLY">Yearly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Next Billing Date</Label>
+                    <Input type="date" value={nextBillingDate} onChange={(e) => setNextBillingDate(e.target.value)} required />
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Currency</Label>
-                  <Select value={currency} onValueChange={(v) => v && setCurrency(v)}>
+                  <Label>Category (optional)</Label>
+                  <Select value={categoryId} onValueChange={(v) => v && setCategoryId(v)}>
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue>{(value: string) => expenseCategories.find((c) => c.id === value)?.name || "Select..."}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {SUPPORTED_CURRENCIES.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
+                      {expenseCategories.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>Frequency</Label>
-                  <Select value={frequency} onValueChange={(v) => v && setFrequency(v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="DAILY">Daily</SelectItem>
-                      <SelectItem value="WEEKLY">Weekly</SelectItem>
-                      <SelectItem value="MONTHLY">Monthly</SelectItem>
-                      <SelectItem value="YEARLY">Yearly</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label>URL (optional)</Label>
+                  <Input placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Next Billing Date</Label>
-                  <Input type="date" value={nextBillingDate} onChange={(e) => setNextBillingDate(e.target.value)} required />
+                  <Label>Notes (optional)</Label>
+                  <Input placeholder="Add a note..." value={notes} onChange={(e) => setNotes(e.target.value)} />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Category (optional)</Label>
-                <Select value={categoryId} onValueChange={(v) => v && setCategoryId(v)}>
-                  <SelectTrigger>
-                    <SelectValue>{(value: string) => expenseCategories.find((c) => c.id === value)?.name || "Select..."}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {expenseCategories.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>URL (optional)</Label>
-                <Input placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Notes (optional)</Label>
-                <Input placeholder="Add a note..." value={notes} onChange={(e) => setNotes(e.target.value)} />
-              </div>
-              <Button type="submit" className="w-full">
-                Add Subscription
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>}
+                <Button type="submit" className="w-full">
+                  Add Subscription
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Summary */}
@@ -296,14 +298,15 @@ export function SubscriptionsClient() {
                   </div>
                   <p className="text-sm font-bold tabular-nums">{currencyFormatter(sub.currency)(sub.amount)}</p>
                   {!isPartnerView && <Switch checked={sub.isActive} onCheckedChange={() => handleToggle(sub.id)} />}
-                  {!isPartnerView && <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(sub.id)}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>}
+                  {!isPartnerView && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(sub.id)}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
           )}
-
         </CardContent>
       </Card>
 
@@ -328,9 +331,11 @@ export function SubscriptionsClient() {
                   </div>
                   <p className="text-sm font-bold tabular-nums">{currencyFormatter(sub.currency)(sub.amount)}</p>
                   {!isPartnerView && <Switch checked={sub.isActive} onCheckedChange={() => handleToggle(sub.id)} />}
-                  {!isPartnerView && <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(sub.id)}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>}
+                  {!isPartnerView && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(sub.id)}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>

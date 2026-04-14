@@ -256,6 +256,7 @@ model Goal {
   name                String
   targetAmount        Decimal  @db.Decimal(19, 4)
   currentAmount       Decimal  @default(0) @db.Decimal(19, 4)
+  currency            String   @default("MYR")
   type                GoalType @default(CUSTOM)
   deadline            DateTime?
   interestRate        Decimal  @default(0) @db.Decimal(5, 2) // Annual interest rate for savings projection

@@ -10,9 +10,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Landmark, Car, Home, GraduationCap, CreditCard, HeartPulse, CircleDollarSign, Trash2, BadgeCheck, Banknote, CalendarDays, Percent, TrendingDown } from "lucide-react";
+import { Plus, Landmark, Car, Home, GraduationCap, CreditCard, HeartPulse, CircleDollarSign, Trash2, BadgeCheck, Banknote, CalendarDays, Percent, TrendingDown, Pencil } from "lucide-react";
 import { usePartnerView } from "@/hooks/use-partner-view";
-import { getDebts, createDebt, makePayment, deleteDebt } from "@/actions/debts";
+import { getDebts, createDebt, updateDebt, makePayment, deleteDebt } from "@/actions/debts";
 import { getAccounts } from "@/actions/accounts";
 import { getExchangeRates as fetchExchangeRates } from "@/actions/exchange-rates";
 import { convertCurrency } from "@/lib/exchange-rates";
@@ -92,6 +92,8 @@ export function DebtsClient() {
   const [loading, setLoading] = useState(true);
   const [rates, setRates] = useState<Record<string, number>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
   const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [payDebtId, setPayDebtId] = useState<string | null>(null);
   const [payAmount, setPayAmount] = useState("");
@@ -170,6 +172,55 @@ export function DebtsClient() {
       fetchData();
     } catch {
       toast.error("Failed to add debt");
+    }
+  };
+
+  const handleEdit = (debt: Debt) => {
+    setEditingDebt(debt);
+    setFormName(debt.name);
+    setFormType(debt.type);
+    setFormLender(debt.lender || "");
+    setFormOriginalAmount(String(debt.originalAmount));
+    setFormRemainingAmount(String(debt.remainingAmount));
+    setFormInterestRate(debt.interestRate ? String(debt.interestRate) : "");
+    setFormMinPayment(debt.minimumPayment ? String(debt.minimumPayment) : "");
+    setFormDueDay(debt.dueDay ? String(debt.dueDay) : "");
+    setFormStartDate(debt.startDate.split("T")[0]);
+    setFormEndDate(debt.endDate ? debt.endDate.split("T")[0] : "");
+    setFormCurrency(debt.currency);
+    setFormNotes(debt.notes || "");
+    setFormAccountId(debt.accountId || "");
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDebt) return;
+    const originalAmt = parseFloat(formOriginalAmount);
+    const remainingAmt = formRemainingAmount ? parseFloat(formRemainingAmount) : originalAmt;
+    try {
+      await updateDebt(editingDebt.id, {
+        name: formName,
+        type: formType as "PERSONAL_LOAN" | "CAR_LOAN" | "MORTGAGE" | "STUDENT_LOAN" | "CREDIT_CARD" | "MEDICAL" | "OTHER",
+        lender: formLender || null,
+        accountId: formAccountId && formAccountId !== "none" ? formAccountId : null,
+        originalAmount: originalAmt,
+        remainingAmount: remainingAmt,
+        interestRate: formInterestRate ? parseFloat(formInterestRate) : 0,
+        minimumPayment: formMinPayment ? parseFloat(formMinPayment) : 0,
+        dueDay: formDueDay ? parseInt(formDueDay) : null,
+        startDate: formStartDate,
+        endDate: formEndDate || null,
+        currency: formCurrency,
+        notes: formNotes || null,
+      });
+      toast.success("Debt updated");
+      setEditDialogOpen(false);
+      setEditingDebt(null);
+      resetForm();
+      fetchData();
+    } catch {
+      toast.error("Failed to update debt");
     }
   };
 
@@ -308,7 +359,7 @@ export function DebtsClient() {
                   <Label>Linked Account (optional)</Label>
                   <Select value={formAccountId} onValueChange={(v) => setFormAccountId(v || "")}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Link to a credit card or loan account" />
+                      <SelectValue>{(value: string) => value === "none" ? "No linked account" : accounts.find((a) => a.id === value)?.name || "Link to a credit card or loan account"}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No linked account</SelectItem>
@@ -477,6 +528,139 @@ export function DebtsClient() {
         </Card>
       </div>
 
+      {/* Edit Debt Dialog */}
+      {!isPartnerView && <Dialog
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open);
+          if (!open) {
+            setEditingDebt(null);
+            resetForm();
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Debt</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdate} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Name</Label>
+              <Input id="edit-name" required value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g. Car Loan, Credit Card" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select value={formType} onValueChange={(v) => setFormType(v || "PERSONAL_LOAN")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DEBT_TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      <span className="flex items-center gap-2">
+                        <opt.icon className="w-4 h-4" style={{ color: DEBT_TYPE_COLORS[opt.value] }} />
+                        {opt.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-lender">Lender (optional)</Label>
+              <Input id="edit-lender" value={formLender} onChange={(e) => setFormLender(e.target.value)} placeholder="e.g. CIMB Bank, Maybank" />
+            </div>
+
+            {accounts.length > 0 && (
+              <div className="space-y-2">
+                <Label>Linked Account (optional)</Label>
+                <Select value={formAccountId} onValueChange={(v) => setFormAccountId(v || "")}>
+                  <SelectTrigger>
+                    <SelectValue>{(value: string) => value === "none" ? "No linked account" : accounts.find((a) => a.id === value)?.name || "Link to a credit card or loan account"}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No linked account</SelectItem>
+                    {accounts.map((acc) => (
+                      <SelectItem key={acc.id} value={acc.id}>
+                        <span className="flex items-center gap-2">
+                          <CreditCard className="w-3.5 h-3.5" style={{ color: acc.color }} />
+                          {acc.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-originalAmount">Original Loan Amount</Label>
+              <Input id="edit-originalAmount" type="number" step="0.01" min="0.01" required value={formOriginalAmount} onChange={(e) => setFormOriginalAmount(e.target.value)} placeholder="0.00" />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-remainingAmount">Remaining Balance</Label>
+              <Input id="edit-remainingAmount" type="number" step="0.01" min="0" value={formRemainingAmount} onChange={(e) => setFormRemainingAmount(e.target.value)} placeholder="Same as original if empty" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="edit-interestRate">Interest Rate (%)</Label>
+                <Input id="edit-interestRate" type="number" step="0.01" min="0" max="100" value={formInterestRate} onChange={(e) => setFormInterestRate(e.target.value)} placeholder="0.00" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-minPayment">Min. Monthly Payment</Label>
+                <Input id="edit-minPayment" type="number" step="0.01" min="0" value={formMinPayment} onChange={(e) => setFormMinPayment(e.target.value)} placeholder="0.00" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="edit-dueDay">Payment Due Day</Label>
+                <Input id="edit-dueDay" type="number" min="1" max="31" value={formDueDay} onChange={(e) => setFormDueDay(e.target.value)} placeholder="Day of month (1-31)" />
+              </div>
+              <div className="space-y-2">
+                <Label>Currency</Label>
+                <Select value={formCurrency} onValueChange={(v) => v && setFormCurrency(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUPPORTED_CURRENCIES.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="edit-startDate">Start Date</Label>
+                <Input id="edit-startDate" type="date" required value={formStartDate} onChange={(e) => setFormStartDate(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-endDate">Expected Payoff Date</Label>
+                <Input id="edit-endDate" type="date" value={formEndDate} onChange={(e) => setFormEndDate(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-notes">Notes (optional)</Label>
+              <Input id="edit-notes" value={formNotes} onChange={(e) => setFormNotes(e.target.value)} placeholder="Any extra details" />
+            </div>
+
+            <Button type="submit" className="w-full">
+              Save Changes
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>}
+
       {/* Payment dialog */}
       <Dialog
         open={payDialogOpen}
@@ -618,6 +802,9 @@ export function DebtsClient() {
                           >
                             <Banknote className="w-4 h-4 mr-1" />
                             Pay
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary" onClick={() => handleEdit(debt)}>
+                            <Pencil className="w-4 h-4" />
                           </Button>
                           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(debt.id)}>
                             <Trash2 className="w-4 h-4" />

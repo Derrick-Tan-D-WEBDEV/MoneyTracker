@@ -216,160 +216,162 @@ export function InstallmentsClient() {
           <h1 className="text-2xl font-bold">Installments</h1>
           <p className="text-muted-foreground text-sm">Track credit card installment plans & balance transfers</p>
         </div>
-        {!isPartnerView && <Dialog
-          open={dialogOpen}
-          onOpenChange={(open) => {
-            setDialogOpen(open);
-            if (!open) resetForm();
-          }}
-        >
-          <DialogTrigger
-            render={
-              <Button>
-                <Plus className="w-4 h-4 mr-2" /> Add Installment
-              </Button>
-            }
-          />
-          <DialogContent className="max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Add Installment Plan</DialogTitle>
-            </DialogHeader>
-            {creditCardAccounts.length === 0 ? (
-              <div className="text-center py-6">
-                <CreditCard className="w-10 h-10 mx-auto text-muted-foreground/50 mb-3" />
-                <p className="text-sm text-muted-foreground">No credit card accounts found.</p>
-                <p className="text-xs text-muted-foreground mt-1">Add a credit card account first to create installments.</p>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Name */}
-                <div className="space-y-2">
-                  <Label>Item / Description</Label>
-                  <Input required value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g. iPhone 16 Pro, Samsung TV" />
-                </div>
-
-                {/* Type & Credit Card */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>Type</Label>
-                    <Select value={formType} onValueChange={(v) => v && setFormType(v)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="PURCHASE">
-                          <span className="flex items-center gap-2">
-                            <ShoppingBag className="w-4 h-4" /> Purchase
-                          </span>
-                        </SelectItem>
-                        <SelectItem value="BALANCE_TRANSFER">
-                          <span className="flex items-center gap-2">
-                            <ArrowLeftRight className="w-4 h-4" /> Balance Transfer
-                          </span>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Credit Card</Label>
-                    <Select value={formAccountId} onValueChange={(v) => v && setFormAccountId(v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select card" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {creditCardAccounts.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Merchant */}
-                <div className="space-y-2">
-                  <Label>Merchant / Vendor (optional)</Label>
-                  <Input value={formMerchant} onChange={(e) => setFormMerchant(e.target.value)} placeholder="e.g. Apple Store, Harvey Norman" />
-                </div>
-
-                {/* Amount & Months */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>Total Amount</Label>
-                    <Input type="number" step="0.01" min="0.01" required value={formTotalAmount} onChange={(e) => setFormTotalAmount(e.target.value)} placeholder="0.00" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Number of Months</Label>
-                    <Input type="number" min="1" max="60" required value={formTotalMonths} onChange={(e) => setFormTotalMonths(e.target.value)} placeholder="12" />
-                  </div>
-                </div>
-
-                {/* Monthly preview */}
-                {formTotalAmount && formTotalMonths && parseInt(formTotalMonths) > 0 && (
-                  <div className="p-3 rounded-lg bg-muted/50 text-sm">
-                    <span className="text-muted-foreground">Monthly payment: </span>
-                    <span className="font-semibold">{currencyFormatter(formCurrency)(parseFloat(formTotalAmount) / parseInt(formTotalMonths))}</span>
-                    <span className="text-muted-foreground"> / month</span>
-                  </div>
-                )}
-
-                {/* Months Already Paid (for starting halfway) */}
-                <div className="space-y-2">
-                  <Label>Months Already Paid</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max={formTotalMonths ? parseInt(formTotalMonths) : 999}
-                    value={formPaidMonths}
-                    onChange={(e) => setFormPaidMonths(e.target.value)}
-                    placeholder="0 for new plans"
-                  />
-                  <p className="text-xs text-muted-foreground">Set this if the installment is already partway through</p>
-                </div>
-
-                {/* Interest Rate & Currency */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>Interest / Fee Rate (%)</Label>
-                    <Input type="number" step="0.01" min="0" max="100" value={formInterestRate} onChange={(e) => setFormInterestRate(e.target.value)} placeholder="0 for 0% plans" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Currency</Label>
-                    <Select value={formCurrency} onValueChange={(v) => v && setFormCurrency(v)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SUPPORTED_CURRENCIES.map((c) => (
-                          <SelectItem key={c} value={c}>
-                            {c}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Start Date */}
-                <div className="space-y-2">
-                  <Label>Start Date</Label>
-                  <Input type="date" required value={formStartDate} onChange={(e) => setFormStartDate(e.target.value)} />
-                </div>
-
-                {/* Notes */}
-                <div className="space-y-2">
-                  <Label>Notes (optional)</Label>
-                  <Input value={formNotes} onChange={(e) => setFormNotes(e.target.value)} placeholder="Any extra details" />
-                </div>
-
-                <Button type="submit" className="w-full">
-                  Add Installment
+        {!isPartnerView && (
+          <Dialog
+            open={dialogOpen}
+            onOpenChange={(open) => {
+              setDialogOpen(open);
+              if (!open) resetForm();
+            }}
+          >
+            <DialogTrigger
+              render={
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" /> Add Installment
                 </Button>
-              </form>
-            )}
-          </DialogContent>
-        </Dialog>}
+              }
+            />
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Add Installment Plan</DialogTitle>
+              </DialogHeader>
+              {creditCardAccounts.length === 0 ? (
+                <div className="text-center py-6">
+                  <CreditCard className="w-10 h-10 mx-auto text-muted-foreground/50 mb-3" />
+                  <p className="text-sm text-muted-foreground">No credit card accounts found.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Add a credit card account first to create installments.</p>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  {/* Name */}
+                  <div className="space-y-2">
+                    <Label>Item / Description</Label>
+                    <Input required value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g. iPhone 16 Pro, Samsung TV" />
+                  </div>
+
+                  {/* Type & Credit Card */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Type</Label>
+                      <Select value={formType} onValueChange={(v) => v && setFormType(v)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="PURCHASE">
+                            <span className="flex items-center gap-2">
+                              <ShoppingBag className="w-4 h-4" /> Purchase
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="BALANCE_TRANSFER">
+                            <span className="flex items-center gap-2">
+                              <ArrowLeftRight className="w-4 h-4" /> Balance Transfer
+                            </span>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Credit Card</Label>
+                      <Select value={formAccountId} onValueChange={(v) => v && setFormAccountId(v)}>
+                        <SelectTrigger>
+                          <SelectValue>{(value: string) => creditCardAccounts.find((a) => a.id === value)?.name || "Select card"}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {creditCardAccounts.map((a) => (
+                            <SelectItem key={a.id} value={a.id}>
+                              {a.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Merchant */}
+                  <div className="space-y-2">
+                    <Label>Merchant / Vendor (optional)</Label>
+                    <Input value={formMerchant} onChange={(e) => setFormMerchant(e.target.value)} placeholder="e.g. Apple Store, Harvey Norman" />
+                  </div>
+
+                  {/* Amount & Months */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Total Amount</Label>
+                      <Input type="number" step="0.01" min="0.01" required value={formTotalAmount} onChange={(e) => setFormTotalAmount(e.target.value)} placeholder="0.00" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Number of Months</Label>
+                      <Input type="number" min="1" max="60" required value={formTotalMonths} onChange={(e) => setFormTotalMonths(e.target.value)} placeholder="12" />
+                    </div>
+                  </div>
+
+                  {/* Monthly preview */}
+                  {formTotalAmount && formTotalMonths && parseInt(formTotalMonths) > 0 && (
+                    <div className="p-3 rounded-lg bg-muted/50 text-sm">
+                      <span className="text-muted-foreground">Monthly payment: </span>
+                      <span className="font-semibold">{currencyFormatter(formCurrency)(parseFloat(formTotalAmount) / parseInt(formTotalMonths))}</span>
+                      <span className="text-muted-foreground"> / month</span>
+                    </div>
+                  )}
+
+                  {/* Months Already Paid (for starting halfway) */}
+                  <div className="space-y-2">
+                    <Label>Months Already Paid</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max={formTotalMonths ? parseInt(formTotalMonths) : 999}
+                      value={formPaidMonths}
+                      onChange={(e) => setFormPaidMonths(e.target.value)}
+                      placeholder="0 for new plans"
+                    />
+                    <p className="text-xs text-muted-foreground">Set this if the installment is already partway through</p>
+                  </div>
+
+                  {/* Interest Rate & Currency */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Interest / Fee Rate (%)</Label>
+                      <Input type="number" step="0.01" min="0" max="100" value={formInterestRate} onChange={(e) => setFormInterestRate(e.target.value)} placeholder="0 for 0% plans" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Currency</Label>
+                      <Select value={formCurrency} onValueChange={(v) => v && setFormCurrency(v)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SUPPORTED_CURRENCIES.map((c) => (
+                            <SelectItem key={c} value={c}>
+                              {c}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Start Date */}
+                  <div className="space-y-2">
+                    <Label>Start Date</Label>
+                    <Input type="date" required value={formStartDate} onChange={(e) => setFormStartDate(e.target.value)} />
+                  </div>
+
+                  {/* Notes */}
+                  <div className="space-y-2">
+                    <Label>Notes (optional)</Label>
+                    <Input value={formNotes} onChange={(e) => setFormNotes(e.target.value)} placeholder="Any extra details" />
+                  </div>
+
+                  <Button type="submit" className="w-full">
+                    Add Installment
+                  </Button>
+                </form>
+              )}
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Stats */}
@@ -575,20 +577,22 @@ export function InstallmentsClient() {
                         </div>
 
                         {/* Actions */}
-                        {!isPartnerView && <div className="flex items-center gap-2 shrink-0">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:border-emerald-800 dark:hover:bg-emerald-900/20"
-                            onClick={() => openPayDialog(inst.id)}
-                          >
-                            <Banknote className="w-4 h-4 mr-1" />
-                            Pay
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(inst.id)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>}
+                        {!isPartnerView && (
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:border-emerald-800 dark:hover:bg-emerald-900/20"
+                              onClick={() => openPayDialog(inst.id)}
+                            >
+                              <Banknote className="w-4 h-4 mr-1" />
+                              Pay
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(inst.id)}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -622,9 +626,11 @@ export function InstallmentsClient() {
                         <span className="text-sm text-muted-foreground">
                           {fmtInst(inst.totalAmount)} · {inst.totalMonths} months
                         </span>
-                        {!isPartnerView && <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(inst.id)}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>}
+                        {!isPartnerView && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(inst.id)}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

@@ -239,137 +239,139 @@ export function RecurringClient() {
               Process Due ({dueCount})
             </Button>
           )}
-          {!isPartnerView && <Dialog
-            open={dialogOpen}
-            onOpenChange={(open) => {
-              setDialogOpen(open);
-              if (!open) resetForm();
-            }}
-          >
-            <DialogTrigger
-              render={
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" /> Add Recurring
-                </Button>
-              }
-            />
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>New Recurring Transaction</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Type toggle */}
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={formType === "EXPENSE" ? "default" : "outline"}
-                    className={formType === "EXPENSE" ? "flex-1 bg-red-500 hover:bg-red-600" : "flex-1"}
-                    onClick={() => {
-                      setFormType("EXPENSE");
-                      setFormCategoryId("");
-                    }}
-                  >
-                    <ArrowDownRight className="w-4 h-4 mr-1" /> Expense
+          {!isPartnerView && (
+            <Dialog
+              open={dialogOpen}
+              onOpenChange={(open) => {
+                setDialogOpen(open);
+                if (!open) resetForm();
+              }}
+            >
+              <DialogTrigger
+                render={
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" /> Add Recurring
                   </Button>
-                  <Button
-                    type="button"
-                    variant={formType === "INCOME" ? "default" : "outline"}
-                    className={formType === "INCOME" ? "flex-1 bg-emerald-500 hover:bg-emerald-600" : "flex-1"}
-                    onClick={() => {
-                      setFormType("INCOME");
-                      setFormCategoryId("");
-                    }}
-                  >
-                    <ArrowUpRight className="w-4 h-4 mr-1" /> Income
-                  </Button>
-                </div>
+                }
+              />
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>New Recurring Transaction</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  {/* Type toggle */}
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={formType === "EXPENSE" ? "default" : "outline"}
+                      className={formType === "EXPENSE" ? "flex-1 bg-red-500 hover:bg-red-600" : "flex-1"}
+                      onClick={() => {
+                        setFormType("EXPENSE");
+                        setFormCategoryId("");
+                      }}
+                    >
+                      <ArrowDownRight className="w-4 h-4 mr-1" /> Expense
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={formType === "INCOME" ? "default" : "outline"}
+                      className={formType === "INCOME" ? "flex-1 bg-emerald-500 hover:bg-emerald-600" : "flex-1"}
+                      onClick={() => {
+                        setFormType("INCOME");
+                        setFormCategoryId("");
+                      }}
+                    >
+                      <ArrowUpRight className="w-4 h-4 mr-1" /> Income
+                    </Button>
+                  </div>
 
-                {/* Amount */}
-                <div className="space-y-2">
-                  <Label htmlFor="amount">Amount</Label>
-                  <Input id="amount" type="number" step="0.01" min="0.01" required value={formAmount} onChange={(e) => setFormAmount(e.target.value)} placeholder="0.00" />
-                </div>
+                  {/* Amount */}
+                  <div className="space-y-2">
+                    <Label htmlFor="amount">Amount</Label>
+                    <Input id="amount" type="number" step="0.01" min="0.01" required value={formAmount} onChange={(e) => setFormAmount(e.target.value)} placeholder="0.00" />
+                  </div>
 
-                {/* Description */}
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Input id="description" required value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="e.g. Netflix, Rent, Salary" />
-                </div>
+                  {/* Description */}
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Input id="description" required value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="e.g. Netflix, Rent, Salary" />
+                  </div>
 
-                {/* Account */}
-                <div className="space-y-2">
-                  <Label>Account</Label>
-                  <Select value={formAccountId} onValueChange={(v) => setFormAccountId(v || "")} required>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          {a.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Category */}
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Select value={formCategoryId} onValueChange={(v) => setFormCategoryId(v || "")}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredCategories.map((c) => {
-                        const IconComp = getCategoryIcon(c.icon);
-                        return (
-                          <SelectItem key={c.id} value={c.id}>
-                            <span className="flex items-center gap-2">
-                              <IconComp className="w-4 h-4" style={{ color: c.color }} />
-                              {c.name}
-                            </span>
+                  {/* Account */}
+                  <div className="space-y-2">
+                    <Label>Account</Label>
+                    <Select value={formAccountId} onValueChange={(v) => setFormAccountId(v || "")} required>
+                      <SelectTrigger>
+                        <SelectValue>{(value: string) => accounts.find((a) => a.id === value)?.name || "Select account"}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.name}
                           </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                {/* Frequency */}
-                <div className="space-y-2">
-                  <Label>Frequency</Label>
-                  <Select value={formFrequency} onValueChange={(v) => setFormFrequency(v || "MONTHLY")} required>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="DAILY">Daily</SelectItem>
-                      <SelectItem value="WEEKLY">Weekly</SelectItem>
-                      <SelectItem value="MONTHLY">Monthly</SelectItem>
-                      <SelectItem value="YEARLY">Yearly</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                  {/* Category */}
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Select value={formCategoryId} onValueChange={(v) => setFormCategoryId(v || "")}>
+                      <SelectTrigger>
+                        <SelectValue>{(value: string) => filteredCategories.find((c) => c.id === value)?.name || "Select category (optional)"}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredCategories.map((c) => {
+                          const IconComp = getCategoryIcon(c.icon);
+                          return (
+                            <SelectItem key={c.id} value={c.id}>
+                              <span className="flex items-center gap-2">
+                                <IconComp className="w-4 h-4" style={{ color: c.color }} />
+                                {c.name}
+                              </span>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                {/* Next Due Date */}
-                <div className="space-y-2">
-                  <Label htmlFor="nextDue">First Due Date</Label>
-                  <Input id="nextDue" type="date" required value={formNextDue} onChange={(e) => setFormNextDue(e.target.value)} />
-                </div>
+                  {/* Frequency */}
+                  <div className="space-y-2">
+                    <Label>Frequency</Label>
+                    <Select value={formFrequency} onValueChange={(v) => setFormFrequency(v || "MONTHLY")} required>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="DAILY">Daily</SelectItem>
+                        <SelectItem value="WEEKLY">Weekly</SelectItem>
+                        <SelectItem value="MONTHLY">Monthly</SelectItem>
+                        <SelectItem value="YEARLY">Yearly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                {/* Notes */}
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes (optional)</Label>
-                  <Input id="notes" value={formNotes} onChange={(e) => setFormNotes(e.target.value)} placeholder="Optional notes" />
-                </div>
+                  {/* Next Due Date */}
+                  <div className="space-y-2">
+                    <Label htmlFor="nextDue">First Due Date</Label>
+                    <Input id="nextDue" type="date" required value={formNextDue} onChange={(e) => setFormNextDue(e.target.value)} />
+                  </div>
 
-                <Button type="submit" className="w-full">
-                  Create Recurring Transaction
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>}
+                  {/* Notes */}
+                  <div className="space-y-2">
+                    <Label htmlFor="notes">Notes (optional)</Label>
+                    <Input id="notes" value={formNotes} onChange={(e) => setFormNotes(e.target.value)} placeholder="Optional notes" />
+                  </div>
+
+                  <Button type="submit" className="w-full">
+                    Create Recurring Transaction
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
 
@@ -484,12 +486,14 @@ export function RecurringClient() {
                     </div>
 
                     {/* Actions */}
-                    {!isPartnerView && <div className="flex items-center gap-2 shrink-0">
-                      <Switch checked={rule.isActive} onCheckedChange={(checked) => handleToggle(rule.id, checked)} />
-                      <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(rule.id)}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>}
+                    {!isPartnerView && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Switch checked={rule.isActive} onCheckedChange={(checked) => handleToggle(rule.id, checked)} />
+                        <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(rule.id)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

@@ -10,6 +10,7 @@ const goalSchema = z.object({
   name: z.string().min(1, "Name is required"),
   targetAmount: z.number().positive("Target amount must be positive"),
   currentAmount: z.number().min(0).default(0),
+  currency: z.string().default("MYR"),
   type: z.enum(["PROPERTY", "VEHICLE", "EMERGENCY_FUND", "RETIREMENT", "VACATION", "EDUCATION", "CUSTOM"]).default("CUSTOM"),
   accountId: z
     .union([z.string().uuid(), z.literal(""), z.null(), z.undefined()])
@@ -66,6 +67,7 @@ export async function getGoals() {
       name: g.name,
       targetAmount,
       currentAmount,
+      currency: g.currency,
       type: g.type,
       deadline: g.deadline?.toISOString() || null,
       interestRate,
@@ -123,10 +125,18 @@ export async function updateGoal(id: string, data: z.input<typeof goalSchema>) {
   if (!existing) throw new Error("Goal not found");
 
   const parsed = goalSchema.parse(data);
+  const { accountId, ...rest } = parsed;
+
+  if (accountId) {
+    const account = await db.financialAccount.findFirst({
+      where: { id: accountId, userId: session.user.id },
+    });
+    if (!account) throw new Error("Account not found");
+  }
 
   await db.goal.update({
     where: { id },
-    data: parsed,
+    data: { ...rest, accountId: accountId || null },
   });
 
   revalidatePath("/");

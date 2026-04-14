@@ -76,14 +76,11 @@ export function TopNav({ linkedPartner }: { linkedPartner?: LinkedPartner }) {
         <div className="bg-pink-500/10 border-b border-pink-500/20 px-4 py-1.5 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-pink-700 dark:text-pink-300">
             <Eye className="w-3.5 h-3.5" />
-            <span>Viewing <strong>{partnerName}</strong>&apos;s data (read-only)</span>
+            <span>
+              Viewing <strong>{partnerName}</strong>&apos;s data (read-only)
+            </span>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => switchToSelf()}
-            className="text-pink-700 dark:text-pink-300 hover:text-pink-900 dark:hover:text-pink-100 h-6 text-xs gap-1"
-          >
+          <Button variant="ghost" size="sm" onClick={() => switchToSelf()} className="text-pink-700 dark:text-pink-300 hover:text-pink-900 dark:hover:text-pink-100 h-6 text-xs gap-1">
             <ArrowLeftRight className="w-3 h-3" />
             Switch back
           </Button>

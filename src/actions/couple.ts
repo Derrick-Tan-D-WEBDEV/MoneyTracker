@@ -198,7 +198,7 @@ export async function getPartnerDashboardData() {
       where: { userId: partnerId, isArchived: false },
     }),
     db.transaction.findMany({
-      where: { userId: partnerId, date: { gte: startOfMonth } },
+      where: { userId: partnerId, isRecurring: false, isAdjustment: false, date: { gte: startOfMonth } },
       include: { category: true, account: true },
       orderBy: { date: "desc" },
       take: 20,

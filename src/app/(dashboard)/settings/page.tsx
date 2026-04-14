@@ -339,20 +339,14 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-4 p-4 bg-pink-50 dark:bg-pink-950/20 rounded-lg border border-pink-200 dark:border-pink-800/30">
                   <Avatar className="w-12 h-12">
                     <AvatarImage src={coupleLink.partner.image || ""} />
-                    <AvatarFallback className="bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-400 font-semibold">
-                      {coupleLink.partner.name?.[0]?.toUpperCase() || "P"}
-                    </AvatarFallback>
+                    <AvatarFallback className="bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-400 font-semibold">{coupleLink.partner.name?.[0]?.toUpperCase() || "P"}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold">{coupleLink.partner.name || "Partner"}</p>
                     <p className="text-sm text-muted-foreground">{coupleLink.partner.email}</p>
-                    <p className="text-xs text-pink-600 dark:text-pink-400 mt-1">
-                      💕 Linked {coupleLink.acceptedAt ? new Date(coupleLink.acceptedAt).toLocaleDateString() : ""}
-                    </p>
+                    <p className="text-xs text-pink-600 dark:text-pink-400 mt-1">💕 Linked {coupleLink.acceptedAt ? new Date(coupleLink.acceptedAt).toLocaleDateString() : ""}</p>
                   </div>
-                  <Badge className="bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-400 border-0">
-                    Active
-                  </Badge>
+                  <Badge className="bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-400 border-0">Active</Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">
                   You can view each other&apos;s financial dashboard. Visit the{" "}
@@ -372,25 +366,14 @@ export default function SettingsPage() {
             ) : coupleLink?.status === "PENDING" && coupleLink.inviteCode ? (
               // Pending invite (I created it)
               <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Share this invite code with your partner. They can enter it in their Settings → Couple tab.
-                </p>
+                <p className="text-sm text-muted-foreground">Share this invite code with your partner. They can enter it in their Settings → Couple tab.</p>
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-muted p-3 rounded-lg font-mono text-lg text-center tracking-widest">
-                    {coupleLink.inviteCode}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleCopyCode(coupleLink.inviteCode!)}
-                    className="shrink-0"
-                  >
+                  <div className="flex-1 bg-muted p-3 rounded-lg font-mono text-lg text-center tracking-widest">{coupleLink.inviteCode}</div>
+                  <Button variant="outline" size="icon" onClick={() => handleCopyCode(coupleLink.inviteCode!)} className="shrink-0">
                     {copiedCode ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Waiting for partner to accept...
-                </p>
+                <p className="text-xs text-muted-foreground">Waiting for partner to accept...</p>
                 <Separator />
                 <div className="flex justify-end">
                   <Button variant="ghost" size="sm" onClick={handleUnlink} disabled={pending} className="gap-2 text-destructive">
@@ -403,9 +386,7 @@ export default function SettingsPage() {
               <div className="space-y-6">
                 <div className="space-y-3">
                   <h4 className="text-sm font-medium">Create an Invite</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Generate a code to share with your partner. Once they accept, you&apos;ll both be able to view each other&apos;s finances.
-                  </p>
+                  <p className="text-sm text-muted-foreground">Generate a code to share with your partner. Once they accept, you&apos;ll both be able to view each other&apos;s finances.</p>
                   <Button onClick={handleCreateInvite} disabled={pending} className="gap-2">
                     {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
                     Generate Invite Code
@@ -414,9 +395,7 @@ export default function SettingsPage() {
                 <Separator />
                 <div className="space-y-3">
                   <h4 className="text-sm font-medium">Accept an Invite</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Enter the invite code your partner shared with you.
-                  </p>
+                  <p className="text-sm text-muted-foreground">Enter the invite code your partner shared with you.</p>
                   <div className="flex gap-2">
                     <Input
                       placeholder="Enter code e.g. A1B2C3D4"

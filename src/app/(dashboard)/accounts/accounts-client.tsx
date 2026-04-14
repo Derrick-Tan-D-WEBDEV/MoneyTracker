@@ -153,12 +153,10 @@ export function AccountsClient() {
   };
 
   const totalBalance = accounts.reduce((s, a) => {
-    const converted = a.currency === userCurrency
-      ? a.balance
-      : (rates[a.currency] ? a.balance / rates[a.currency] : a.balance);
+    const converted = a.currency === userCurrency ? a.balance : rates[a.currency] ? a.balance / rates[a.currency] : a.balance;
     if (a.type === "CREDIT_CARD") {
       // Balance = available credit; liability = creditLimit - balance (used)
-      const limit = a.creditLimit != null ? (a.currency === userCurrency ? a.creditLimit : (rates[a.currency] ? a.creditLimit / rates[a.currency] : a.creditLimit)) : 0;
+      const limit = a.creditLimit != null ? (a.currency === userCurrency ? a.creditLimit : rates[a.currency] ? a.creditLimit / rates[a.currency] : a.creditLimit) : 0;
       return s - (limit - converted);
     }
     return s + converted;
@@ -173,92 +171,94 @@ export function AccountsClient() {
           <h1 className="text-2xl font-bold text-foreground">Accounts</h1>
           <p className="text-muted-foreground">Manage your financial accounts</p>
         </div>
-        {!isPartnerView && <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger render={<Button />}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Account
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Account</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Account Name</Label>
-                <Input placeholder="e.g., Main Checking" value={formName} onChange={(e) => setFormName(e.target.value)} required />
-              </div>
+        {!isPartnerView && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger render={<Button />}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Account
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Account</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Account Name</Label>
+                  <Input placeholder="e.g., Main Checking" value={formName} onChange={(e) => setFormName(e.target.value)} required />
+                </div>
 
-              <div className="space-y-2">
-                <Label>Account Type</Label>
-                <Select value={formType} onValueChange={(v) => v && setFormType(v)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ACCOUNT_TYPES.map((t) => (
-                      <SelectItem key={t.value} value={t.value}>
-                        {t.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                <div className="space-y-2">
+                  <Label>Account Type</Label>
+                  <Select value={formType} onValueChange={(v) => v && setFormType(v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ACCOUNT_TYPES.map((t) => (
+                        <SelectItem key={t.value} value={t.value}>
+                          {t.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="space-y-2">
-                <Label>Current Balance</Label>
-                <Input type="number" step="0.01" value={formBalance} onChange={(e) => setFormBalance(e.target.value)} required />
-              </div>
+                <div className="space-y-2">
+                  <Label>{formType === "CREDIT_CARD" ? "Available Balance" : "Current Balance"}</Label>
+                  <Input type="number" step="0.01" value={formBalance} onChange={(e) => setFormBalance(e.target.value)} required />
+                </div>
 
-              {formType === "CREDIT_CARD" && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>Credit Limit</Label>
-                    <Input type="number" step="0.01" min="0" placeholder="e.g., 10000" value={formCreditLimit} onChange={(e) => setFormCreditLimit(e.target.value)} />
+                {formType === "CREDIT_CARD" && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Credit Limit</Label>
+                      <Input type="number" step="0.01" min="0" placeholder="e.g., 10000" value={formCreditLimit} onChange={(e) => setFormCreditLimit(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Repayment Day</Label>
+                      <Input type="number" min="1" max="31" placeholder="1-31" value={formRepaymentDay} onChange={(e) => setFormRepaymentDay(e.target.value)} />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Repayment Day</Label>
-                    <Input type="number" min="1" max="31" placeholder="1-31" value={formRepaymentDay} onChange={(e) => setFormRepaymentDay(e.target.value)} />
+                )}
+
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <Select value={formCurrency} onValueChange={(v) => v && setFormCurrency(v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SUPPORTED_CURRENCIES.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Color</Label>
+                  <div className="flex gap-2">
+                    {ACCOUNT_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        className={`w-7 h-7 rounded-full transition-transform ${formColor === color ? "ring-2 ring-offset-2 ring-slate-400 scale-110" : ""}`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => setFormColor(color)}
+                      />
+                    ))}
                   </div>
                 </div>
-              )}
 
-              <div className="space-y-2">
-                <Label>Currency</Label>
-                <Select value={formCurrency} onValueChange={(v) => v && setFormCurrency(v)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SUPPORTED_CURRENCIES.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Color</Label>
-                <div className="flex gap-2">
-                  {ACCOUNT_COLORS.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      className={`w-7 h-7 rounded-full transition-transform ${formColor === color ? "ring-2 ring-offset-2 ring-slate-400 scale-110" : ""}`}
-                      style={{ backgroundColor: color }}
-                      onClick={() => setFormColor(color)}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <Button type="submit" className="w-full">
-                Create Account
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>}
+                <Button type="submit" className="w-full">
+                  Create Account
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Total balance */}
@@ -307,14 +307,16 @@ export function AccountsClient() {
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: account.color + "20" }}>
                       <Icon className="w-5 h-5" style={{ color: account.color }} />
                     </div>
-                    {!isPartnerView && <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary"
-                      onClick={() => handleEdit(account)}
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </Button>}
+                    {!isPartnerView && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary"
+                        onClick={() => handleEdit(account)}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
                   </div>
                   <div className="mt-3">
                     <p className="text-sm font-medium text-foreground">{account.name}</p>
@@ -354,98 +356,100 @@ export function AccountsClient() {
       )}
 
       {/* Edit Account Dialog */}
-      {!isPartnerView && <Dialog
-        open={editDialogOpen}
-        onOpenChange={(open) => {
-          setEditDialogOpen(open);
-          if (!open) {
-            setEditingAccount(null);
-            resetForm();
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Account</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleUpdate} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Account Name</Label>
-              <Input placeholder="e.g., Main Checking" value={formName} onChange={(e) => setFormName(e.target.value)} required />
-            </div>
+      {!isPartnerView && (
+        <Dialog
+          open={editDialogOpen}
+          onOpenChange={(open) => {
+            setEditDialogOpen(open);
+            if (!open) {
+              setEditingAccount(null);
+              resetForm();
+            }
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Account</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleUpdate} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Account Name</Label>
+                <Input placeholder="e.g., Main Checking" value={formName} onChange={(e) => setFormName(e.target.value)} required />
+              </div>
 
-            <div className="space-y-2">
-              <Label>Account Type</Label>
-              <Select value={formType} onValueChange={(v) => v && setFormType(v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ACCOUNT_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>
-                      {t.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="space-y-2">
+                <Label>Account Type</Label>
+                <Select value={formType} onValueChange={(v) => v && setFormType(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ACCOUNT_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="space-y-2">
-              <Label>Balance</Label>
-              <Input type="number" step="0.01" value={formBalance} onChange={(e) => setFormBalance(e.target.value)} required />
-              {editingAccount && parseFloat(formBalance) !== editingAccount.balance && <p className="text-xs text-muted-foreground">Changing the balance will create an adjustment record</p>}
-            </div>
+              <div className="space-y-2">
+                <Label>{formType === "CREDIT_CARD" ? "Available Balance" : "Balance"}</Label>
+                <Input type="number" step="0.01" value={formBalance} onChange={(e) => setFormBalance(e.target.value)} required />
+                {editingAccount && parseFloat(formBalance) !== editingAccount.balance && <p className="text-xs text-muted-foreground">Changing the balance will create an adjustment record</p>}
+              </div>
 
-            {formType === "CREDIT_CARD" && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>Credit Limit</Label>
-                  <Input type="number" step="0.01" min="0" placeholder="e.g., 10000" value={formCreditLimit} onChange={(e) => setFormCreditLimit(e.target.value)} />
+              {formType === "CREDIT_CARD" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Credit Limit</Label>
+                    <Input type="number" step="0.01" min="0" placeholder="e.g., 10000" value={formCreditLimit} onChange={(e) => setFormCreditLimit(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Repayment Day</Label>
+                    <Input type="number" min="1" max="31" placeholder="1-31" value={formRepaymentDay} onChange={(e) => setFormRepaymentDay(e.target.value)} />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Repayment Day</Label>
-                  <Input type="number" min="1" max="31" placeholder="1-31" value={formRepaymentDay} onChange={(e) => setFormRepaymentDay(e.target.value)} />
+              )}
+
+              <div className="space-y-2">
+                <Label>Currency</Label>
+                <Select value={formCurrency} onValueChange={(v) => v && setFormCurrency(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUPPORTED_CURRENCIES.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Color</Label>
+                <div className="flex gap-2">
+                  {ACCOUNT_COLORS.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      className={`w-7 h-7 rounded-full transition-transform ${formColor === color ? "ring-2 ring-offset-2 ring-slate-400 scale-110" : ""}`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => setFormColor(color)}
+                    />
+                  ))}
                 </div>
               </div>
-            )}
 
-            <div className="space-y-2">
-              <Label>Currency</Label>
-              <Select value={formCurrency} onValueChange={(v) => v && setFormCurrency(v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SUPPORTED_CURRENCIES.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Color</Label>
-              <div className="flex gap-2">
-                {ACCOUNT_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    className={`w-7 h-7 rounded-full transition-transform ${formColor === color ? "ring-2 ring-offset-2 ring-slate-400 scale-110" : ""}`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setFormColor(color)}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <Button type="submit" className="w-full">
-              Save Changes
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>}
+              <Button type="submit" className="w-full">
+                Save Changes
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

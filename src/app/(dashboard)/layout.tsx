@@ -22,8 +22,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     // Not authenticated yet
   }
 
-  const linkedPartner =
-    coupleLink?.status === "ACCEPTED" && coupleLink.partner ? { id: coupleLink.partner.id, name: coupleLink.partner.name, image: coupleLink.partner.image } : null;
+  const linkedPartner = coupleLink?.status === "ACCEPTED" && coupleLink.partner ? { id: coupleLink.partner.id, name: coupleLink.partner.name, image: coupleLink.partner.image } : null;
 
   return (
     <SessionProvider>

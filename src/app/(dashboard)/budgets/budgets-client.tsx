@@ -115,69 +115,71 @@ export function BudgetsClient() {
           <h1 className="text-2xl font-bold text-foreground">Budgets</h1>
           <p className="text-muted-foreground">Set spending limits per category</p>
         </div>
-        {!isPartnerView && <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger render={<Button />}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Budget
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create Budget</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Category</Label>
-                <Select value={formCategoryId} onValueChange={(v) => v && setFormCategoryId(v)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue>{(value: string) => categories.find((c) => c.id === value)?.name || "Select category..."}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((c) => {
-                      const CIcon = getCategoryIcon(c.icon);
-                      return (
-                        <SelectItem key={c.id} value={c.id}>
-                          <span className="flex items-center gap-2">
-                            <CIcon className="w-3.5 h-3.5 shrink-0" style={{ color: c.color }} />
-                            {c.name}
-                          </span>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
+        {!isPartnerView && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger render={<Button />}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Budget
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create Budget</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <Select value={formCategoryId} onValueChange={(v) => v && setFormCategoryId(v)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue>{(value: string) => categories.find((c) => c.id === value)?.name || "Select category..."}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((c) => {
+                        const CIcon = getCategoryIcon(c.icon);
+                        return (
+                          <SelectItem key={c.id} value={c.id}>
+                            <span className="flex items-center gap-2">
+                              <CIcon className="w-3.5 h-3.5 shrink-0" style={{ color: c.color }} />
+                              {c.name}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="space-y-2">
-                <Label>Budget Amount</Label>
-                <Input type="number" step="1" min="1" placeholder="500" value={formAmount} onChange={(e) => setFormAmount(e.target.value)} required />
-              </div>
+                <div className="space-y-2">
+                  <Label>Budget Amount</Label>
+                  <Input type="number" step="1" min="1" placeholder="500" value={formAmount} onChange={(e) => setFormAmount(e.target.value)} required />
+                </div>
 
-              <div className="space-y-2">
-                <Label>Period</Label>
-                <Select value={formPeriod} onValueChange={(v) => v && setFormPeriod(v)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="WEEKLY">Weekly</SelectItem>
-                    <SelectItem value="MONTHLY">Monthly</SelectItem>
-                    <SelectItem value="YEARLY">Yearly</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                <div className="space-y-2">
+                  <Label>Period</Label>
+                  <Select value={formPeriod} onValueChange={(v) => v && setFormPeriod(v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="WEEKLY">Weekly</SelectItem>
+                      <SelectItem value="MONTHLY">Monthly</SelectItem>
+                      <SelectItem value="YEARLY">Yearly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="space-y-2">
-                <Label>Alert at (%)</Label>
-                <Input type="number" min="1" max="100" value={formAlertThreshold} onChange={(e) => setFormAlertThreshold(e.target.value)} placeholder="80" />
-                <p className="text-xs text-muted-foreground">Get warned when spending reaches this percentage</p>
-              </div>
+                <div className="space-y-2">
+                  <Label>Alert at (%)</Label>
+                  <Input type="number" min="1" max="100" value={formAlertThreshold} onChange={(e) => setFormAlertThreshold(e.target.value)} placeholder="80" />
+                  <p className="text-xs text-muted-foreground">Get warned when spending reaches this percentage</p>
+                </div>
 
-              <Button type="submit" className="w-full">
-                Create Budget
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>}
+                <Button type="submit" className="w-full">
+                  Create Budget
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Alert Banner */}
@@ -272,14 +274,16 @@ export function BudgetsClient() {
                       {budget.period}
                     </Badge>
                   </div>
-                  {!isPartnerView && <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500"
-                    onClick={() => handleDelete(budget.id)}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>}
+                  {!isPartnerView && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500"
+                      onClick={() => handleDelete(budget.id)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
                 </div>
 
                 <div className="flex items-baseline justify-between mb-2">

@@ -150,86 +150,88 @@ export function InvestmentsClient() {
           <h1 className="text-2xl font-bold text-foreground">Investments</h1>
           <p className="text-muted-foreground">Track your investment portfolio</p>
         </div>
-        {!isPartnerView && <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger render={<Button />}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Investment
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Investment</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>Name</Label>
-                  <Input placeholder="Apple Inc." value={formName} onChange={(e) => setFormName(e.target.value)} required />
+        {!isPartnerView && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger render={<Button />}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Investment
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Investment</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Name</Label>
+                    <Input placeholder="Apple Inc." value={formName} onChange={(e) => setFormName(e.target.value)} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Symbol</Label>
+                    <Input placeholder="AAPL" value={formSymbol} onChange={(e) => setFormSymbol(e.target.value)} />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Symbol</Label>
-                  <Input placeholder="AAPL" value={formSymbol} onChange={(e) => setFormSymbol(e.target.value)} />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>Type</Label>
-                  <Select value={formType} onValueChange={(v) => v && setFormType(v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {INVESTMENT_TYPES.map((t) => (
-                        <SelectItem key={t.value} value={t.value}>
-                          {t.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Type</Label>
+                    <Select value={formType} onValueChange={(v) => v && setFormType(v)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {INVESTMENT_TYPES.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>
+                            {t.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Currency</Label>
+                    <Select value={formCurrency} onValueChange={(v) => v && setFormCurrency(v)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPPORTED_CURRENCIES.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Currency</Label>
-                  <Select value={formCurrency} onValueChange={(v) => v && setFormCurrency(v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SUPPORTED_CURRENCIES.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-2">
-                  <Label>Quantity</Label>
-                  <Input type="number" step="any" min="0.00000001" placeholder="10" value={formQuantity} onChange={(e) => setFormQuantity(e.target.value)} required />
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-2">
+                    <Label>Quantity</Label>
+                    <Input type="number" step="any" min="0.00000001" placeholder="10" value={formQuantity} onChange={(e) => setFormQuantity(e.target.value)} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Buy Price</Label>
+                    <Input type="number" step="0.01" min="0.01" placeholder="150.00" value={formBuyPrice} onChange={(e) => setFormBuyPrice(e.target.value)} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Current Price</Label>
+                    <Input type="number" step="0.01" min="0" placeholder="175.00" value={formCurrentPrice} onChange={(e) => setFormCurrentPrice(e.target.value)} required />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Buy Price</Label>
-                  <Input type="number" step="0.01" min="0.01" placeholder="150.00" value={formBuyPrice} onChange={(e) => setFormBuyPrice(e.target.value)} required />
-                </div>
-                <div className="space-y-2">
-                  <Label>Current Price</Label>
-                  <Input type="number" step="0.01" min="0" placeholder="175.00" value={formCurrentPrice} onChange={(e) => setFormCurrentPrice(e.target.value)} required />
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label>Buy Date</Label>
-                <Input type="date" value={formBuyDate} onChange={(e) => setFormBuyDate(e.target.value)} required />
-              </div>
+                <div className="space-y-2">
+                  <Label>Buy Date</Label>
+                  <Input type="date" value={formBuyDate} onChange={(e) => setFormBuyDate(e.target.value)} required />
+                </div>
 
-              <Button type="submit" className="w-full">
-                Add Investment
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>}
+                <Button type="submit" className="w-full">
+                  Add Investment
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Summary */}
@@ -341,9 +343,11 @@ export function InvestmentsClient() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {!isPartnerView && <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(inv.id)}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>}
+                        {!isPartnerView && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500" onClick={() => handleDelete(inv.id)}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

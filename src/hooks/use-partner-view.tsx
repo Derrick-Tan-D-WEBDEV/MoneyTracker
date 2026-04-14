@@ -74,11 +74,7 @@ export function PartnerViewProvider({
     router.refresh();
   }, [router]);
 
-  return (
-    <PartnerViewContext.Provider value={{ ...state, switchToPartner, switchToSelf }}>
-      {children}
-    </PartnerViewContext.Provider>
-  );
+  return <PartnerViewContext.Provider value={{ ...state, switchToPartner, switchToSelf }}>{children}</PartnerViewContext.Provider>;
 }
 
 export function usePartnerView() {
