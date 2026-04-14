@@ -213,6 +213,7 @@ model Budget {
   userId     String       @db.Uuid
   categoryId String       @db.Uuid
   amount     Decimal      @db.Decimal(19, 4)
+  currency       String       @default("MYR")
   period         BudgetPeriod @default(MONTHLY)
   alertThreshold Int          @default(80)
   startDate      DateTime

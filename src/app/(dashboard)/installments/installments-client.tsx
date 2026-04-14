@@ -273,7 +273,13 @@ export function InstallmentsClient() {
                     </div>
                     <div className="space-y-2">
                       <Label>Credit Card</Label>
-                      <Select value={formAccountId} onValueChange={(v) => v && setFormAccountId(v)}>
+                      <Select value={formAccountId} onValueChange={(v) => {
+                        if (v) {
+                          setFormAccountId(v);
+                          const acc = creditCardAccounts.find((a) => a.id === v);
+                          if (acc) setFormCurrency(acc.currency);
+                        }
+                      }}>
                         <SelectTrigger>
                           <SelectValue>{(value: string) => creditCardAccounts.find((a) => a.id === value)?.name || "Select card"}</SelectValue>
                         </SelectTrigger>

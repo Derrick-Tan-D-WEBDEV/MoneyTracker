@@ -10,6 +10,7 @@ import { getViewUser } from "@/lib/partner-view";
 const budgetSchema = z.object({
   categoryId: z.string().uuid(),
   amount: z.number().positive("Amount must be positive"),
+  currency: z.string().default("MYR"),
   period: z.enum(["WEEKLY", "MONTHLY", "YEARLY"]).default("MONTHLY"),
   alertThreshold: z.number().min(1).max(100).default(80),
   startDate: z.string().transform((s) => new Date(s)),
@@ -46,6 +47,9 @@ export async function getBudgets() {
         include: { account: true },
       });
 
+      const budgetCurrency = budget.currency || userCurrency;
+      const budgetAmount = convertCurrency(Number(budget.amount), budgetCurrency, userCurrency, rates);
+
       const spent = transactions.reduce((sum, t) => sum + convertCurrency(Number(t.amount), t.account.currency, userCurrency, rates), 0);
 
       return {
@@ -54,14 +58,15 @@ export async function getBudgets() {
         category: budget.category.name,
         categoryColor: budget.category.color,
         categoryIcon: budget.category.icon,
-        amount: Number(budget.amount),
+        amount: budgetAmount,
+        currency: budgetCurrency,
         period: budget.period,
         alertThreshold: budget.alertThreshold,
         spent,
-        remaining: Math.max(Number(budget.amount) - spent, 0),
-        percentage: Number(budget.amount) > 0 ? (spent / Number(budget.amount)) * 100 : 0,
-        isOverBudget: spent > Number(budget.amount),
-        isNearLimit: Number(budget.amount) > 0 && (spent / Number(budget.amount)) * 100 >= budget.alertThreshold && spent <= Number(budget.amount),
+        remaining: Math.max(budgetAmount - spent, 0),
+        percentage: budgetAmount > 0 ? (spent / budgetAmount) * 100 : 0,
+        isOverBudget: spent > budgetAmount,
+        isNearLimit: budgetAmount > 0 && (spent / budgetAmount) * 100 >= budget.alertThreshold && spent <= budgetAmount,
       };
     }),
   );

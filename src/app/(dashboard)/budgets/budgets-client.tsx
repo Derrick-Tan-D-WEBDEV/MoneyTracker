@@ -18,6 +18,7 @@ import { getCategories } from "@/actions/categories";
 import { toast } from "sonner";
 import { currencyFormatter } from "@/lib/format";
 import { useSession } from "next-auth/react";
+import { SUPPORTED_CURRENCIES } from "@/lib/constants";
 
 interface Budget {
   id: string;
@@ -26,6 +27,7 @@ interface Budget {
   categoryColor: string;
   categoryIcon: string;
   amount: number;
+  currency: string;
   period: string;
   alertThreshold: number;
   spent: number;
@@ -54,6 +56,7 @@ export function BudgetsClient() {
 
   const [formCategoryId, setFormCategoryId] = useState("");
   const [formAmount, setFormAmount] = useState("");
+  const [formCurrency, setFormCurrency] = useState(session?.user?.currency || "MYR");
   const [formPeriod, setFormPeriod] = useState("MONTHLY");
   const [formAlertThreshold, setFormAlertThreshold] = useState("80");
 
@@ -79,6 +82,7 @@ export function BudgetsClient() {
       await createBudget({
         categoryId: formCategoryId,
         amount: parseFloat(formAmount),
+        currency: formCurrency,
         period: formPeriod as "WEEKLY" | "MONTHLY" | "YEARLY",
         alertThreshold: parseInt(formAlertThreshold) || 80,
         startDate: new Date().toISOString(),
@@ -88,6 +92,7 @@ export function BudgetsClient() {
       setDialogOpen(false);
       setFormCategoryId("");
       setFormAmount("");
+      setFormCurrency(session?.user?.currency || "MYR");
       fetchData();
     } catch {
       toast.error("Failed to create budget");
@@ -151,6 +156,22 @@ export function BudgetsClient() {
                 <div className="space-y-2">
                   <Label>Budget Amount</Label>
                   <Input type="number" step="1" min="1" placeholder="500" value={formAmount} onChange={(e) => setFormAmount(e.target.value)} required />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <Select value={formCurrency} onValueChange={(v) => v && setFormCurrency(v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SUPPORTED_CURRENCIES.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
