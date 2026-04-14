@@ -10,15 +10,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { User, Lock, Globe, Save, Loader2, Check } from "lucide-react";
+import { User, Lock, Globe, Save, Loader2, Check, Heart, Copy, Link2, Unlink } from "lucide-react";
 import { getProfile, updateProfile, updatePassword } from "@/actions/settings";
+import { getCoupleLink, createInviteLink, acceptInviteLink, unlinkPartner } from "@/actions/couple";
 import { SUPPORTED_CURRENCIES, DATE_FORMATS } from "@/lib/constants";
 import { getUserStats } from "@/actions/gamification";
 import { LevelBadge } from "@/components/dashboard/level-badge";
 import { StreakBadge } from "@/components/dashboard/streak-badge";
 import { toast } from "sonner";
 
-type Tab = "profile" | "security" | "preferences";
+type Tab = "profile" | "security" | "preferences" | "couple";
 
 export default function SettingsPage() {
   const { data: session, update: updateSession } = useSession();
@@ -40,6 +41,19 @@ export default function SettingsPage() {
   // Gamification state
   const [stats, setStats] = useState<{ xp: number; level: number; streak: number; unlockedCount: number; totalAchievements: number } | null>(null);
 
+  // Couple link state
+  const [coupleLink, setCoupleLink] = useState<{
+    id: string;
+    status: string;
+    inviteCode: string | null;
+    partner: { id: string; name: string | null; email: string | null; image: string | null } | null;
+    isInitiator: boolean;
+    createdAt: string;
+    acceptedAt: string | null;
+  } | null>(null);
+  const [inviteInput, setInviteInput] = useState("");
+  const [copiedCode, setCopiedCode] = useState(false);
+
   useEffect(() => {
     getProfile().then((profile) => {
       setName(profile.name || "");
@@ -48,6 +62,7 @@ export default function SettingsPage() {
       setHasPassword(profile.hasPassword);
     });
     getUserStats().then((s) => setStats(s));
+    getCoupleLink().then((link) => setCoupleLink(link));
   }, []);
 
   const initials = user?.name
@@ -89,10 +104,64 @@ export default function SettingsPage() {
     });
   };
 
+  const handleCreateInvite = () => {
+    startTransition(async () => {
+      try {
+        const result = await createInviteLink();
+        setCoupleLink({
+          id: "",
+          status: "PENDING",
+          inviteCode: result.inviteCode,
+          partner: null,
+          isInitiator: true,
+          createdAt: new Date().toISOString(),
+          acceptedAt: null,
+        });
+        toast.success("Invite code created!");
+      } catch (e: unknown) {
+        toast.error(e instanceof Error ? e.message : "Failed to create invite");
+      }
+    });
+  };
+
+  const handleAcceptInvite = () => {
+    if (!inviteInput.trim()) return;
+    startTransition(async () => {
+      try {
+        await acceptInviteLink(inviteInput.trim().toUpperCase());
+        const link = await getCoupleLink();
+        setCoupleLink(link);
+        setInviteInput("");
+        toast.success("Couple linked successfully! 💕");
+      } catch (e: unknown) {
+        toast.error(e instanceof Error ? e.message : "Failed to accept invite");
+      }
+    });
+  };
+
+  const handleUnlink = () => {
+    startTransition(async () => {
+      try {
+        await unlinkPartner();
+        setCoupleLink(null);
+        toast.success("Couple link removed");
+      } catch (e: unknown) {
+        toast.error(e instanceof Error ? e.message : "Failed to unlink");
+      }
+    });
+  };
+
+  const handleCopyCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "profile", label: "Profile", icon: <User className="w-4 h-4" /> },
     { key: "security", label: "Security", icon: <Lock className="w-4 h-4" /> },
     { key: "preferences", label: "Preferences", icon: <Globe className="w-4 h-4" /> },
+    { key: "couple", label: "Couple", icon: <Heart className="w-4 h-4" /> },
   ];
 
   return (
@@ -250,6 +319,120 @@ export default function SettingsPage() {
                 Save Preferences
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Couple Tab */}
+      {tab === "couple" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Heart className="w-4 h-4 text-pink-500" />
+              Couple Linking
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {coupleLink?.status === "ACCEPTED" && coupleLink.partner ? (
+              // Active couple link
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 p-4 bg-pink-50 dark:bg-pink-950/20 rounded-lg border border-pink-200 dark:border-pink-800/30">
+                  <Avatar className="w-12 h-12">
+                    <AvatarImage src={coupleLink.partner.image || ""} />
+                    <AvatarFallback className="bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-400 font-semibold">
+                      {coupleLink.partner.name?.[0]?.toUpperCase() || "P"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold">{coupleLink.partner.name || "Partner"}</p>
+                    <p className="text-sm text-muted-foreground">{coupleLink.partner.email}</p>
+                    <p className="text-xs text-pink-600 dark:text-pink-400 mt-1">
+                      💕 Linked {coupleLink.acceptedAt ? new Date(coupleLink.acceptedAt).toLocaleDateString() : ""}
+                    </p>
+                  </div>
+                  <Badge className="bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-400 border-0">
+                    Active
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  You can view each other&apos;s financial dashboard. Visit the{" "}
+                  <a href="/partner" className="text-pink-600 dark:text-pink-400 underline font-medium">
+                    Partner Dashboard
+                  </a>{" "}
+                  to see their finances.
+                </p>
+                <Separator />
+                <div className="flex justify-end">
+                  <Button variant="destructive" size="sm" onClick={handleUnlink} disabled={pending} className="gap-2">
+                    {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlink className="w-4 h-4" />}
+                    Unlink Partner
+                  </Button>
+                </div>
+              </div>
+            ) : coupleLink?.status === "PENDING" && coupleLink.inviteCode ? (
+              // Pending invite (I created it)
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Share this invite code with your partner. They can enter it in their Settings → Couple tab.
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-muted p-3 rounded-lg font-mono text-lg text-center tracking-widest">
+                    {coupleLink.inviteCode}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleCopyCode(coupleLink.inviteCode!)}
+                    className="shrink-0"
+                  >
+                    {copiedCode ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Waiting for partner to accept...
+                </p>
+                <Separator />
+                <div className="flex justify-end">
+                  <Button variant="ghost" size="sm" onClick={handleUnlink} disabled={pending} className="gap-2 text-destructive">
+                    Cancel Invite
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              // No link — show options to create or accept
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium">Create an Invite</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Generate a code to share with your partner. Once they accept, you&apos;ll both be able to view each other&apos;s finances.
+                  </p>
+                  <Button onClick={handleCreateInvite} disabled={pending} className="gap-2">
+                    {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+                    Generate Invite Code
+                  </Button>
+                </div>
+                <Separator />
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium">Accept an Invite</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Enter the invite code your partner shared with you.
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Enter code e.g. A1B2C3D4"
+                      value={inviteInput}
+                      onChange={(e) => setInviteInput(e.target.value.toUpperCase())}
+                      className="font-mono tracking-widest"
+                      maxLength={8}
+                    />
+                    <Button onClick={handleAcceptInvite} disabled={pending || !inviteInput.trim()} className="gap-2">
+                      {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Heart className="w-4 h-4" />}
+                      Link
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

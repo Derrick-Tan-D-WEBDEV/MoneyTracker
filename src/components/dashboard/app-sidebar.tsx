@@ -20,6 +20,7 @@ import {
   Download,
   ShoppingBag,
   Calculator,
+  Heart,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,7 @@ const navItems = [
   { href: "/reports", icon: BarChart3, label: "Reports" },
   { href: "/export", icon: Download, label: "Export" },
   { href: "/tax", icon: Calculator, label: "Tax Prediction" },
+  { href: "/partner", icon: Heart, label: "Partner" },
 ];
 
 export function AppSidebar() {

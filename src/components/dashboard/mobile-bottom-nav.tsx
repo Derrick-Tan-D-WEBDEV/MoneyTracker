@@ -23,6 +23,7 @@ import {
   Calculator,
   Menu,
   X,
+  Heart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +47,7 @@ const moreItems = [
   { href: "/reports", icon: BarChart3, label: "Reports" },
   { href: "/export", icon: Download, label: "Export" },
   { href: "/tax", icon: Calculator, label: "Tax" },
+  { href: "/partner", icon: Heart, label: "Partner" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ];
 

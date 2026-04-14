@@ -40,6 +40,8 @@ model User {
   netWorthSnapshots NetWorthSnapshot[]
   subscriptions     Subscription[]
   wishlistItems     WishlistItem[]
+  coupleLinksAsUser    CoupleLink[] @relation("CoupleLinkUser")
+  coupleLinksAsPartner CoupleLink[] @relation("CoupleLinkPartner")
 }
 
 model Account {
@@ -442,4 +444,31 @@ model WishlistItem {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// ─── Couple Linking ────────────────────────────────────────────────
+
+enum CoupleLinkStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model CoupleLink {
+  id          String           @id @default(uuid()) @db.Uuid
+  userId      String           @db.Uuid
+  partnerId   String?          @db.Uuid
+  inviteCode  String           @unique
+  inviteEmail String?
+  status      CoupleLinkStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  acceptedAt  DateTime?
+
+  user    User  @relation("CoupleLinkUser", fields: [userId], references: [id], onDelete: Cascade)
+  partner User? @relation("CoupleLinkPartner", fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, partnerId])
+  @@index([userId])
+  @@index([partnerId])
+  @@index([inviteCode])
 }
