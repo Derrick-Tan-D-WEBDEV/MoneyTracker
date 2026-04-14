@@ -74,8 +74,7 @@ export function CalendarClient() {
     eventsByDay.get(day)!.push(event);
   }
 
-  const convertToUser = (amount: number, currency: string) =>
-    convertCurrency(amount, currency, serverCurrency, rates);
+  const convertToUser = (amount: number, currency: string) => convertCurrency(amount, currency, serverCurrency, rates);
   const totalMonthly = events.reduce((s, e) => s + convertToUser(e.amount, e.currency), 0);
   const upcomingEvents = events.filter((e) => {
     const d = new Date(e.date);
