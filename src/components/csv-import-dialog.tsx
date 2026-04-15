@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Upload, FileText, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
-import { importTransactions, checkTransactionAchievements } from "@/actions/transactions";
+import { importTransactions, checkTransactionAchievements, checkDuplicateTransactions } from "@/actions/transactions";
 import { toast } from "sonner";
 import { parseBankStatementPDF } from "@/lib/pdf-parser";
 
@@ -42,6 +42,7 @@ interface ReviewRow {
   amount: number;
   categoryName: string | null;
   notes: string | null;
+  isDuplicate?: boolean;
 }
 
 interface CSVImportDialogProps {
@@ -125,13 +126,13 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
     if (isPdf) {
       setParsing(true);
       parseBankStatementPDF(file)
-        .then((parsed) => {
+        .then(async (parsed) => {
           if (parsed.length === 0) {
             toast.error("No transactions found in PDF");
             setParsing(false);
             return;
           }
-          const rows: ReviewRow[] = parsed.map((tx, i) => ({
+          let rows: ReviewRow[] = parsed.map((tx, i) => ({
             id: i,
             selected: true,
             date: tx.date,
@@ -141,6 +142,10 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
             categoryName: null,
             notes: tx.notes,
           }));
+          const acctId = defaultAccountId || accountId;
+          if (acctId) {
+            rows = await markDuplicates(rows, acctId);
+          }
           setReviewRows(rows);
           setParsing(false);
           setStep("review");
@@ -228,7 +233,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
       .filter(Boolean) as { date: string; description: string; type: "INCOME" | "EXPENSE"; categoryName: string | null; amount: number; notes: string | null }[];
   };
 
-  const handleProceedToReview = () => {
+  const handleProceedToReview = async () => {
     if (!accountId) {
       toast.error("Please select an account");
       return;
@@ -239,7 +244,9 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
     }
     // Convert CSV mapped rows to review rows
     const rows = parsedRows();
-    setReviewRows(rows.map((r, i) => ({ id: i, selected: true, ...r })));
+    let mapped = rows.map((r, i) => ({ id: i, selected: true, ...r }));
+    mapped = await markDuplicates(mapped, accountId);
+    setReviewRows(mapped);
     setStep("review");
   };
 
@@ -254,6 +261,25 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
 
   const updateRow = (id: number, field: keyof ReviewRow, value: string | number) => {
     setReviewRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+  };
+
+  const markDuplicates = async (rows: ReviewRow[], acctId: string) => {
+    if (!acctId) return rows;
+    try {
+      const dupes = await checkDuplicateTransactions(
+        acctId,
+        rows.map((r) => ({ date: r.date, amount: r.amount })),
+      );
+      if (dupes.size === 0) return rows;
+      const updated = rows.map((r) => {
+        const key = `${new Date(r.date).toISOString().split("T")[0]}|${r.amount}`;
+        const isDup = dupes.has(key);
+        return { ...r, isDuplicate: isDup, selected: isDup ? false : r.selected };
+      });
+      return updated;
+    } catch {
+      return rows;
+    }
   };
 
   const handleImport = async () => {
@@ -441,6 +467,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
             const incomeCount = selected.filter((r) => r.type === "INCOME").length;
             const expenseCount = selected.filter((r) => r.type === "EXPENSE").length;
             const allSelected = reviewRows.length > 0 && reviewRows.every((r) => r.selected);
+            const duplicateCount = reviewRows.filter((r) => r.isDuplicate).length;
 
             return (
               <div className="space-y-4">
@@ -481,6 +508,13 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                   </div>
                 </div>
 
+                {duplicateCount > 0 && (
+                  <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{duplicateCount} potential duplicate{duplicateCount > 1 ? "s" : ""} found (auto-deselected). You can still re-select them if needed.</span>
+                  </div>
+                )}
+
                 <div className="border rounded-lg overflow-auto max-h-[400px]">
                   <Table>
                     <TableHeader>
@@ -496,11 +530,20 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                     </TableHeader>
                     <TableBody>
                       {reviewRows.map((row) => (
-                        <TableRow key={row.id} className={!row.selected ? "opacity-40" : ""}>
+                        <TableRow key={row.id} className={`${!row.selected ? "opacity-40" : ""} ${row.isDuplicate ? "bg-amber-50/50 dark:bg-amber-950/20" : ""}`}>
                           <TableCell>
                             <input type="checkbox" checked={row.selected} onChange={() => toggleRow(row.id)} className="rounded border-muted-foreground" />
                           </TableCell>
-                          <TableCell className="text-sm">{row.date}</TableCell>
+                          <TableCell className="text-sm">
+                            <div className="flex items-center gap-1">
+                              {row.date}
+                              {row.isDuplicate && (
+                                <Badge variant="outline" className="text-[10px] px-1 py-0 border-amber-400 text-amber-600">
+                                  DUPE
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Input value={row.description} onChange={(e) => updateRow(row.id, "description", e.target.value)} className="h-7 text-sm" />
                           </TableCell>

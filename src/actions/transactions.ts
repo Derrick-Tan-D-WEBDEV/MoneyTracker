@@ -366,3 +366,50 @@ export async function importTransactions(rows: z.input<typeof importRowSchema>[]
 
   return { imported, skipped, total: rows.length };
 }
+
+export async function checkDuplicateTransactions(
+  accountId: string,
+  rows: { date: string; amount: number }[],
+): Promise<Set<string>> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
+
+  if (rows.length === 0) return new Set();
+
+  // Get the date range from the rows to narrow the query
+  const dates = rows.map((r) => new Date(r.date));
+  const minDate = new Date(Math.min(...dates.map((d) => d.getTime())));
+  const maxDate = new Date(Math.max(...dates.map((d) => d.getTime())));
+  minDate.setDate(minDate.getDate() - 1);
+  maxDate.setDate(maxDate.getDate() + 1);
+
+  const existing = await db.transaction.findMany({
+    where: {
+      userId: session.user.id,
+      accountId,
+      date: { gte: minDate, lte: maxDate },
+    },
+    select: { date: true, amount: true },
+  });
+
+  // Build a set of "date|amount" keys from existing transactions
+  const existingKeys = new Set<string>();
+  for (const tx of existing) {
+    const dateStr = tx.date.toISOString().split("T")[0];
+    const amount = decryptAmount(tx.amount, encKey);
+    existingKeys.add(`${dateStr}|${amount}`);
+  }
+
+  // Return the set of "date|amount" keys that match
+  const duplicates = new Set<string>();
+  for (const row of rows) {
+    const dateStr = new Date(row.date).toISOString().split("T")[0];
+    const key = `${dateStr}|${row.amount}`;
+    if (existingKeys.has(key)) {
+      duplicates.add(key);
+    }
+  }
+
+  return duplicates;
+}
