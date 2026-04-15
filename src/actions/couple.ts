@@ -222,21 +222,27 @@ export async function getPartnerDashboardData() {
   const rates = await getExchangeRates(partnerCurrency);
   const toPC = (amount: number, from: string) => convertCurrency(amount, from, partnerCurrency, rates);
 
-  const encKey = await getEncryptionKeyForUser(partnerId);
+  let encKey: string | null = null;
+  try {
+    encKey = await getEncryptionKeyForUser(partnerId);
+  } catch {
+    // Partner hasn't logged in since encryption was enabled
+  }
+  const da = (val: unknown) => encKey ? decryptAmount(val, encKey) : Number(val) || 0;
 
   const accountBalance = accounts.reduce((sum, acc) => {
-    const bal = decryptAmount(acc.balance, encKey) - decryptAmount(acc.reservedAmount, encKey);
+    const bal = da(acc.balance) - da(acc.reservedAmount);
     if (acc.type === "CREDIT_CARD") {
-      const limit = acc.creditLimit ? decryptAmount(acc.creditLimit, encKey) : 0;
+      const limit = acc.creditLimit ? da(acc.creditLimit) : 0;
       return sum - toPC(limit - bal, acc.currency);
     }
     return sum + toPC(bal, acc.currency);
   }, 0);
-  const totalDebtAmount = debts.reduce((sum, d) => sum + toPC(decryptAmount(d.remainingAmount, encKey), d.currency), 0);
+  const totalDebtAmount = debts.reduce((sum, d) => sum + toPC(da(d.remainingAmount), d.currency), 0);
   const totalBalance = accountBalance - totalDebtAmount;
 
-  const monthIncome = transactions.filter((t) => t.type === "INCOME").reduce((sum, t) => sum + toPC(decryptAmount(t.amount, encKey), t.account.currency), 0);
-  const monthExpenses = transactions.filter((t) => t.type === "EXPENSE").reduce((sum, t) => sum + toPC(decryptAmount(t.amount, encKey), t.account.currency), 0);
+  const monthIncome = transactions.filter((t) => t.type === "INCOME").reduce((sum, t) => sum + toPC(da(t.amount), t.account.currency), 0);
+  const monthExpenses = transactions.filter((t) => t.type === "EXPENSE").reduce((sum, t) => sum + toPC(da(t.amount), t.account.currency), 0);
 
   return {
     partner: {
@@ -255,8 +261,8 @@ export async function getPartnerDashboardData() {
       id: a.id,
       name: a.name,
       type: a.type,
-      balance: decryptAmount(a.balance, encKey),
-      reservedAmount: decryptAmount(a.reservedAmount, encKey),
+      balance: da(a.balance),
+      reservedAmount: da(a.reservedAmount),
       currency: a.currency,
       color: a.color,
       icon: a.icon,
@@ -264,7 +270,7 @@ export async function getPartnerDashboardData() {
     recentTransactions: transactions.slice(0, 10).map((t) => ({
       id: t.id,
       type: t.type,
-      amount: decryptAmount(t.amount, encKey),
+      amount: da(t.amount),
       description: t.description,
       date: t.date.toISOString(),
       category: t.category?.name || "Uncategorized",
@@ -274,8 +280,8 @@ export async function getPartnerDashboardData() {
     goals: goals.map((g) => ({
       id: g.id,
       name: g.name,
-      targetAmount: decryptAmount(g.targetAmount, encKey),
-      currentAmount: decryptAmount(g.currentAmount, encKey),
+      targetAmount: da(g.targetAmount),
+      currentAmount: da(g.currentAmount),
       type: g.type,
       icon: g.icon,
       color: g.color,
@@ -284,9 +290,9 @@ export async function getPartnerDashboardData() {
       id: d.id,
       name: d.name,
       type: d.type,
-      originalAmount: decryptAmount(d.originalAmount, encKey),
-      remainingAmount: decryptAmount(d.remainingAmount, encKey),
+      originalAmount: da(d.originalAmount),
+      remainingAmount: da(d.remainingAmount),
     })),
-    totalDebt: debts.reduce((sum, d) => sum + toPC(decryptAmount(d.remainingAmount, encKey), d.currency), 0),
+    totalDebt: debts.reduce((sum, d) => sum + toPC(da(d.remainingAmount), d.currency), 0),
   };
 }

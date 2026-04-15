@@ -88,6 +88,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.encryptionKey = (user as Record<string, unknown>).encryptionKey;
         }
       }
+      // Force re-login if encryption key is missing from token (pre-encryption session)
+      if (token.id && !token.encryptionKey) {
+        return {} as typeof token;
+      }
       // On sign-in, unlock the "Welcome Aboard" achievement
       if (token.id && trigger === "signIn") {
         const { tryUnlockDirect } = await import("@/actions/gamification");
