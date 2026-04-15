@@ -134,8 +134,9 @@ export async function getEncryptionKey(): Promise<string> {
   const { decode } = await import("next-auth/jwt");
 
   const cookieStore = await cookies();
-  const secureCookie = process.env.NODE_ENV === "production";
-  const cookieName = secureCookie ? "__Secure-authjs.session-token" : "authjs.session-token";
+  // NextAuth uses __Secure- prefix only when AUTH_URL is https
+  const useSecurePrefix = (process.env.AUTH_URL || process.env.NEXTAUTH_URL || "").startsWith("https://");
+  const cookieName = useSecurePrefix ? "__Secure-authjs.session-token" : "authjs.session-token";
   const tokenValue = cookieStore.get(cookieName)?.value;
 
   if (!tokenValue) throw new Error("Encryption key not available. Please log in again.");
