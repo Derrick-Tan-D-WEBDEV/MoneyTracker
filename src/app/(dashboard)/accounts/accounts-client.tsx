@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Wallet, CreditCard, Landmark, PiggyBank, Banknote, TrendingUp, Bitcoin, Pencil, ArrowRightLeft } from "lucide-react";
+import { Plus, Wallet, CreditCard, Landmark, PiggyBank, Banknote, TrendingUp, Bitcoin, Pencil, ArrowRightLeft, Upload } from "lucide-react";
 import { usePartnerView } from "@/hooks/use-partner-view";
 import { getAccounts, createAccount, updateAccount } from "@/actions/accounts";
 import { getExchangeRates } from "@/actions/exchange-rates";
@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { currencyFormatter } from "@/lib/format";
 import { useSession } from "next-auth/react";
 import { SUPPORTED_CURRENCIES } from "@/lib/constants";
+import { CSVImportDialog } from "@/components/csv-import-dialog";
 
 const ACCOUNT_TYPES = [
   { value: "CHECKING", label: "Checking", icon: Landmark },
@@ -59,6 +60,8 @@ export function AccountsClient() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importAccountId, setImportAccountId] = useState<string | undefined>(undefined);
   const [rates, setRates] = useState<RateMap>({});
 
   const [formName, setFormName] = useState("");
@@ -323,14 +326,28 @@ export function AccountsClient() {
                       <Icon className="w-5 h-5" style={{ color: account.color }} />
                     </div>
                     {!isPartnerView && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary"
-                        onClick={() => handleEdit(account)}
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary"
+                          title="Import transactions"
+                          onClick={() => {
+                            setImportAccountId(account.id);
+                            setImportOpen(true);
+                          }}
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary"
+                          onClick={() => handleEdit(account)}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     )}
                   </div>
                   <div className="mt-3">
@@ -374,6 +391,20 @@ export function AccountsClient() {
             );
           })}
         </div>
+      )}
+
+      {/* Edit Account Dialog */}
+      {!isPartnerView && (
+        <CSVImportDialog
+          open={importOpen}
+          onOpenChange={(open) => {
+            setImportOpen(open);
+            if (!open) setImportAccountId(undefined);
+          }}
+          accounts={accounts}
+          onImported={fetchAccounts}
+          defaultAccountId={importAccountId}
+        />
       )}
 
       {/* Edit Account Dialog */}

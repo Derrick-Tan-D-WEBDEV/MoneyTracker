@@ -5,12 +5,14 @@ import Papa from "papaparse";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileText, AlertCircle, CheckCircle2, X } from "lucide-react";
+import { Upload, FileText, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { importTransactions, checkTransactionAchievements } from "@/actions/transactions";
 import { toast } from "sonner";
+import { parseBankStatementPDF } from "@/lib/pdf-parser";
 
 type ColumnMapping = "skip" | "date" | "description" | "type" | "category" | "amount" | "notes";
 
@@ -31,11 +33,23 @@ interface Account {
   balance: number;
 }
 
+interface ReviewRow {
+  id: number;
+  selected: boolean;
+  date: string;
+  description: string;
+  type: "INCOME" | "EXPENSE";
+  amount: number;
+  categoryName: string | null;
+  notes: string | null;
+}
+
 interface CSVImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   accounts: Account[];
   onImported: () => void;
+  defaultAccountId?: string;
 }
 
 function autoDetectMapping(headers: string[]): ColumnMapping[] {
@@ -61,28 +75,34 @@ function inferType(amountStr: string, typeStr?: string): "INCOME" | "EXPENSE" {
   return num >= 0 ? "INCOME" : "EXPENSE";
 }
 
-export function CSVImportDialog({ open, onOpenChange, accounts, onImported }: CSVImportDialogProps) {
+export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defaultAccountId }: CSVImportDialogProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [step, setStep] = useState<"upload" | "mapping" | "preview" | "result">("upload");
+  const [step, setStep] = useState<"upload" | "mapping" | "review" | "result">("upload");
+  const [fileType, setFileType] = useState<"csv" | "pdf">("csv");
+  const [parsing, setParsing] = useState(false);
   const [fileName, setFileName] = useState("");
   const [headers, setHeaders] = useState<string[]>([]);
   const [rawRows, setRawRows] = useState<string[][]>([]);
   const [mapping, setMapping] = useState<ColumnMapping[]>([]);
-  const [accountId, setAccountId] = useState("");
+  const [accountId, setAccountId] = useState(defaultAccountId || "");
   const [defaultType, setDefaultType] = useState<"EXPENSE" | "INCOME">("EXPENSE");
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{ imported: number; skipped: number; total: number } | null>(null);
+  const [reviewRows, setReviewRows] = useState<ReviewRow[]>([]);
 
   const reset = () => {
     setStep("upload");
+    setFileType("csv");
+    setParsing(false);
     setFileName("");
     setHeaders([]);
     setRawRows([]);
     setMapping([]);
-    setAccountId("");
+    setAccountId(defaultAccountId || "");
     setDefaultType("EXPENSE");
     setImporting(false);
     setResult(null);
+    setReviewRows([]);
   };
 
   const handleClose = (open: boolean) => {
@@ -91,37 +111,71 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported }: CS
   };
 
   const handleFile = useCallback((file: File) => {
-    if (!file.name.endsWith(".csv")) {
-      toast.error("Please select a CSV file");
+    const isPdf = file.name.toLowerCase().endsWith(".pdf");
+    const isCsv = file.name.toLowerCase().endsWith(".csv");
+
+    if (!isPdf && !isCsv) {
+      toast.error("Please select a CSV or PDF file");
       return;
     }
 
     setFileName(file.name);
-    Papa.parse(file, {
-      complete: (results) => {
-        const data = results.data as string[][];
-        if (data.length < 2) {
-          toast.error("CSV file is empty or has no data rows");
-          return;
-        }
+    setFileType(isPdf ? "pdf" : "csv");
 
-        const csvHeaders = data[0];
-        const csvRows = data.slice(1).filter((row) => row.some((cell) => cell.trim()));
+    if (isPdf) {
+      setParsing(true);
+      parseBankStatementPDF(file)
+        .then((parsed) => {
+          if (parsed.length === 0) {
+            toast.error("No transactions found in PDF");
+            setParsing(false);
+            return;
+          }
+          const rows: ReviewRow[] = parsed.map((tx, i) => ({
+            id: i,
+            selected: true,
+            date: tx.date,
+            description: tx.description,
+            type: tx.type,
+            amount: tx.amount,
+            categoryName: null,
+            notes: tx.notes,
+          }));
+          setReviewRows(rows);
+          setParsing(false);
+          setStep("review");
+        })
+        .catch(() => {
+          toast.error("Failed to parse PDF file");
+          setParsing(false);
+        });
+    } else {
+      Papa.parse(file, {
+        complete: (results) => {
+          const data = results.data as string[][];
+          if (data.length < 2) {
+            toast.error("CSV file is empty or has no data rows");
+            return;
+          }
 
-        if (csvRows.length === 0) {
-          toast.error("No data rows found in CSV");
-          return;
-        }
+          const csvHeaders = data[0];
+          const csvRows = data.slice(1).filter((row) => row.some((cell) => cell.trim()));
 
-        setHeaders(csvHeaders);
-        setRawRows(csvRows);
-        setMapping(autoDetectMapping(csvHeaders));
-        setStep("mapping");
-      },
-      error: () => {
-        toast.error("Failed to parse CSV file");
-      },
-    });
+          if (csvRows.length === 0) {
+            toast.error("No data rows found in CSV");
+            return;
+          }
+
+          setHeaders(csvHeaders);
+          setRawRows(csvRows);
+          setMapping(autoDetectMapping(csvHeaders));
+          setStep("mapping");
+        },
+        error: () => {
+          toast.error("Failed to parse CSV file");
+        },
+      });
+    }
   }, []);
 
   const handleDrop = useCallback(
@@ -174,7 +228,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported }: CS
       .filter(Boolean) as { date: string; description: string; type: "INCOME" | "EXPENSE"; categoryName: string | null; amount: number; notes: string | null }[];
   };
 
-  const handleProceedToPreview = () => {
+  const handleProceedToReview = () => {
     if (!accountId) {
       toast.error("Please select an account");
       return;
@@ -183,16 +237,45 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported }: CS
       toast.error("Please map at least Amount and either Description or Date");
       return;
     }
-    setStep("preview");
+    // Convert CSV mapped rows to review rows
+    const rows = parsedRows();
+    setReviewRows(rows.map((r, i) => ({ id: i, selected: true, ...r })));
+    setStep("review");
+  };
+
+  const toggleRow = (id: number) => {
+    setReviewRows((prev) => prev.map((r) => (r.id === id ? { ...r, selected: !r.selected } : r)));
+  };
+
+  const toggleAll = () => {
+    const allSelected = reviewRows.every((r) => r.selected);
+    setReviewRows((prev) => prev.map((r) => ({ ...r, selected: !allSelected })));
+  };
+
+  const updateRow = (id: number, field: keyof ReviewRow, value: string | number) => {
+    setReviewRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
   };
 
   const handleImport = async () => {
+    const selected = reviewRows.filter((r) => r.selected);
+    if (selected.length === 0) {
+      toast.error("No transactions selected");
+      return;
+    }
+    if (!accountId) {
+      toast.error("Please select an account");
+      return;
+    }
     setImporting(true);
     try {
-      const rows = parsedRows().map((row) => ({
-        ...row,
-        accountId,
+      const rows = selected.map((row) => ({
         date: new Date(row.date).toISOString(),
+        description: row.description,
+        type: row.type,
+        categoryName: row.categoryName,
+        amount: row.amount,
+        notes: row.notes,
+        accountId,
       }));
 
       const res = await importTransactions(rows);
@@ -216,31 +299,40 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported }: CS
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {step === "upload" && "Import CSV"}
+            {step === "upload" && "Import Transactions"}
             {step === "mapping" && "Map Columns"}
-            {step === "preview" && "Preview Import"}
+            {step === "review" && "Review Transactions"}
             {step === "result" && "Import Complete"}
           </DialogTitle>
         </DialogHeader>
 
         {step === "upload" && (
           <div className="space-y-4">
-            <div
-              className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-colors"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Upload className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
-              <p className="font-medium text-foreground">Drop your CSV file here</p>
-              <p className="text-sm text-muted-foreground mt-1">or click to browse</p>
-              <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleFileInput} />
-            </div>
+            {parsing ? (
+              <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                <Loader2 className="w-10 h-10 mx-auto mb-3 text-muted-foreground animate-spin" />
+                <p className="font-medium text-foreground">Parsing PDF...</p>
+                <p className="text-sm text-muted-foreground mt-1">Extracting transactions from {fileName}</p>
+              </div>
+            ) : (
+              <div
+                className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
+                <p className="font-medium text-foreground">Drop your file here</p>
+                <p className="text-sm text-muted-foreground mt-1">CSV or PDF bank statement</p>
+                <input ref={fileInputRef} type="file" accept=".csv,.pdf" className="hidden" onChange={handleFileInput} />
+              </div>
+            )}
             <div className="bg-muted/50 rounded-lg p-4 space-y-2">
               <p className="text-sm font-medium flex items-center gap-2">
                 <FileText className="w-4 h-4" /> Supported formats
               </p>
               <ul className="text-sm text-muted-foreground space-y-1 ml-6 list-disc">
+                <li>PDF bank statements (DBS/POSB, OCBC, UOB, and more)</li>
                 <li>MoneyTracker export format (Date, Description, Type, Category, Account, Currency, Amount, Notes)</li>
                 <li>Bank CSV exports with date, description, and amount columns</li>
                 <li>Any CSV with headers — you&apos;ll map columns in the next step</li>
@@ -257,21 +349,23 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported }: CS
               <Badge variant="secondary">{rawRows.length} rows</Badge>
             </div>
 
-            <div className="space-y-2">
-              <Label>Target Account *</Label>
-              <Select value={accountId} onValueChange={(v) => v && setAccountId(v)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue>{(value: string) => accounts.find((a) => a.id === value)?.name || "Select account..."}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {!defaultAccountId && (
+              <div className="space-y-2">
+                <Label>Target Account *</Label>
+                <Select value={accountId} onValueChange={(v) => v && setAccountId(v)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue>{(value: string) => accounts.find((a) => a.id === value)?.name || "Select account..."}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Default transaction type (when type column is not mapped)</Label>
@@ -334,27 +428,48 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported }: CS
               <Button variant="outline" onClick={reset}>
                 Back
               </Button>
-              <Button onClick={handleProceedToPreview} disabled={!accountId || !hasRequiredMappings()}>
+              <Button onClick={handleProceedToReview} disabled={!accountId || !hasRequiredMappings()}>
                 Preview
               </Button>
             </div>
           </div>
         )}
 
-        {step === "preview" &&
+        {step === "review" &&
           (() => {
-            const rows = parsedRows();
-            const previewRows = rows.slice(0, 20);
-            const incomeCount = rows.filter((r) => r.type === "INCOME").length;
-            const expenseCount = rows.filter((r) => r.type === "EXPENSE").length;
-            const total = rows.reduce((s, r) => s + (r.type === "INCOME" ? r.amount : -r.amount), 0);
+            const selected = reviewRows.filter((r) => r.selected);
+            const incomeCount = selected.filter((r) => r.type === "INCOME").length;
+            const expenseCount = selected.filter((r) => r.type === "EXPENSE").length;
+            const allSelected = reviewRows.length > 0 && reviewRows.every((r) => r.selected);
 
             return (
               <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-3">
+                {fileType === "pdf" && !defaultAccountId && (
+                  <div className="space-y-2">
+                    <Label>Target Account *</Label>
+                    <Select value={accountId} onValueChange={(v) => v && setAccountId(v)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue>{(value: string) => accounts.find((a) => a.id === value)?.name || "Select account..."}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-4 gap-3">
                   <div className="bg-muted/50 rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold">{rows.length}</p>
-                    <p className="text-xs text-muted-foreground">Transactions</p>
+                    <p className="text-2xl font-bold">{selected.length}</p>
+                    <p className="text-xs text-muted-foreground">Selected</p>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold">{reviewRows.length}</p>
+                    <p className="text-xs text-muted-foreground">Total</p>
                   </div>
                   <div className="bg-muted/50 rounded-lg p-3 text-center">
                     <p className="text-2xl font-bold text-emerald-600">{incomeCount}</p>
@@ -366,55 +481,74 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported }: CS
                   </div>
                 </div>
 
-                {rawRows.length - rows.length > 0 && (
-                  <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{rawRows.length - rows.length} rows will be skipped (invalid amount)</span>
-                  </div>
-                )}
-
-                <div className="border rounded-lg overflow-auto max-h-[300px]">
+                <div className="border rounded-lg overflow-auto max-h-[400px]">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Date</TableHead>
+                        <TableHead className="w-[40px]">
+                          <input
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={toggleAll}
+                            className="rounded border-muted-foreground"
+                          />
+                        </TableHead>
+                        <TableHead className="w-[90px]">Date</TableHead>
                         <TableHead>Description</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="w-[90px]">Type</TableHead>
+                        <TableHead className="w-[100px] text-right">Amount</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {previewRows.map((row, i) => (
-                        <TableRow key={i}>
+                      {reviewRows.map((row) => (
+                        <TableRow key={row.id} className={!row.selected ? "opacity-40" : ""}>
+                          <TableCell>
+                            <input
+                              type="checkbox"
+                              checked={row.selected}
+                              onChange={() => toggleRow(row.id)}
+                              className="rounded border-muted-foreground"
+                            />
+                          </TableCell>
                           <TableCell className="text-sm">{row.date}</TableCell>
-                          <TableCell className="text-sm font-medium max-w-[200px] truncate">{row.description}</TableCell>
+                          <TableCell>
+                            <Input
+                              value={row.description}
+                              onChange={(e) => updateRow(row.id, "description", e.target.value)}
+                              className="h-7 text-sm"
+                            />
+                          </TableCell>
                           <TableCell>
                             <Badge
                               variant={row.type === "INCOME" ? "default" : "secondary"}
-                              className={row.type === "INCOME" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : ""}
+                              className={`cursor-pointer select-none ${row.type === "INCOME" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : ""}`}
+                              onClick={() => updateRow(row.id, "type", row.type === "INCOME" ? "EXPENSE" : "INCOME")}
                             >
                               {row.type}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{row.categoryName || "—"}</TableCell>
-                          <TableCell className={`text-right text-sm font-semibold tabular-nums ${row.type === "INCOME" ? "text-emerald-600" : ""}`}>
-                            {row.type === "INCOME" ? "+" : "-"}
-                            {row.amount.toFixed(2)}
+                          <TableCell className="text-right">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={row.amount}
+                              onChange={(e) => updateRow(row.id, "amount", Math.abs(parseFloat(e.target.value) || 0))}
+                              className="h-7 text-sm text-right tabular-nums w-[90px] ml-auto"
+                            />
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
-                {rows.length > 20 && <p className="text-sm text-muted-foreground text-center">Showing 20 of {rows.length} transactions</p>}
 
                 <div className="flex justify-between">
-                  <Button variant="outline" onClick={() => setStep("mapping")}>
+                  <Button variant="outline" onClick={() => fileType === "csv" ? setStep("mapping") : reset()}>
                     Back
                   </Button>
-                  <Button onClick={handleImport} disabled={importing || rows.length === 0}>
-                    {importing ? "Importing..." : `Import ${rows.length} Transactions`}
+                  <Button onClick={handleImport} disabled={importing || selected.length === 0 || !accountId}>
+                    {importing ? "Importing..." : `Import ${selected.length} Transactions`}
                   </Button>
                 </div>
               </div>
