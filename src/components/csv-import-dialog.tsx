@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, FileText, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { importTransactions, checkTransactionAchievements, checkDuplicateTransactions } from "@/actions/transactions";
 import { toast } from "sonner";
-import { parseBankStatementPDF } from "@/lib/pdf-parser";
+import { parseBankStatementPDF, BANK_OPTIONS, type BankFormat } from "@/lib/pdf-parser";
 
 type ColumnMapping = "skip" | "date" | "description" | "type" | "category" | "amount" | "notes";
 
@@ -92,6 +92,8 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
   const [result, setResult] = useState<{ imported: number; skipped: number; total: number } | null>(null);
   const [reviewRows, setReviewRows] = useState<ReviewRow[]>([]);
   const [adjustBalance, setAdjustBalance] = useState(false);
+  const [selectedBank, setSelectedBank] = useState<BankFormat | "">("");
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const reset = () => {
     setStep("upload");
@@ -107,6 +109,8 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
     setResult(null);
     setReviewRows([]);
     setAdjustBalance(false);
+    setSelectedBank("");
+    setPendingFile(null);
   };
 
   const handleClose = (open: boolean) => {
@@ -127,37 +131,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
     setFileType(isPdf ? "pdf" : "csv");
 
     if (isPdf) {
-      setParsing(true);
-      parseBankStatementPDF(file)
-        .then(async (parsed) => {
-          if (parsed.length === 0) {
-            toast.error("No transactions found in PDF");
-            setParsing(false);
-            return;
-          }
-          let rows: ReviewRow[] = parsed.map((tx, i) => ({
-            id: i,
-            selected: true,
-            date: tx.date,
-            description: tx.description,
-            type: tx.type,
-            amount: tx.amount,
-            categoryName: null,
-            notes: tx.notes,
-            statementBalance: tx.statementBalance,
-          }));
-          const acctId = defaultAccountId || accountId;
-          if (acctId) {
-            rows = await markDuplicates(rows, acctId);
-          }
-          setReviewRows(rows);
-          setParsing(false);
-          setStep("review");
-        })
-        .catch(() => {
-          toast.error("Failed to parse PDF file");
-          setParsing(false);
-        });
+      setPendingFile(file);
     } else {
       Papa.parse(file, {
         complete: (results) => {
@@ -186,6 +160,40 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
       });
     }
   }, []);
+
+  const parsePdf = async (bank: BankFormat) => {
+    if (!pendingFile) return;
+    setParsing(true);
+    try {
+      const parsed = await parseBankStatementPDF(pendingFile, bank);
+      if (parsed.length === 0) {
+        toast.error("No transactions found in PDF");
+        setParsing(false);
+        return;
+      }
+      let rows: ReviewRow[] = parsed.map((tx, i) => ({
+        id: i,
+        selected: true,
+        date: tx.date,
+        description: tx.description,
+        type: tx.type,
+        amount: tx.amount,
+        categoryName: null,
+        notes: tx.notes,
+        statementBalance: tx.statementBalance,
+      }));
+      const acctId = defaultAccountId || accountId;
+      if (acctId) {
+        rows = await markDuplicates(rows, acctId);
+      }
+      setReviewRows(rows);
+      setParsing(false);
+      setStep("review");
+    } catch {
+      toast.error("Failed to parse PDF file");
+      setParsing(false);
+    }
+  };
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -352,11 +360,39 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
-                <p className="font-medium text-foreground">Drop your file here</p>
-                <p className="text-sm text-muted-foreground mt-1">CSV or PDF bank statement</p>
+                {pendingFile ? (
+                  <>
+                    <p className="font-medium text-foreground">{fileName}</p>
+                    <p className="text-sm text-muted-foreground mt-1">Click to change file</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium text-foreground">Drop your file here</p>
+                    <p className="text-sm text-muted-foreground mt-1">CSV or PDF bank statement</p>
+                  </>
+                )}
                 <input ref={fileInputRef} type="file" accept=".csv,.pdf" className="hidden" onChange={handleFileInput} />
               </div>
             )}
+
+            {pendingFile && !parsing && (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label>Bank Format *</Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {BANK_OPTIONS.map((opt) => (
+                      <Button key={opt.value} type="button" variant={selectedBank === opt.value ? "default" : "outline"} size="sm" className="w-full" onClick={() => setSelectedBank(opt.value)}>
+                        {opt.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <Button className="w-full" disabled={!selectedBank} onClick={() => selectedBank && parsePdf(selectedBank)}>
+                  Parse Statement
+                </Button>
+              </div>
+            )}
+
             <div className="bg-muted/50 rounded-lg p-4 space-y-2">
               <p className="text-sm font-medium flex items-center gap-2">
                 <FileText className="w-4 h-4" /> Supported formats
@@ -476,7 +512,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
             const currentAccount = accounts.find((a) => a.id === accountId);
             const startingBalance = currentAccount?.balance ?? 0;
 
-            // Compute running balance for selected rows
+            // Compute running balance for selected rows (used for CSV imports)
             const runningBalances = new Map<number, number>();
             let bal = startingBalance;
             for (const row of reviewRows) {
@@ -486,6 +522,11 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
               runningBalances.set(row.id, bal);
             }
             const finalBalance = bal;
+
+            // Statement balance range (used for PDF imports)
+            const stmtBalances = reviewRows.filter((r) => r.statementBalance != null);
+            const firstStmtBal = stmtBalances.length > 0 ? stmtBalances[0].statementBalance! : null;
+            const lastStmtBal = stmtBalances.length > 0 ? stmtBalances[stmtBalances.length - 1].statementBalance! : null;
 
             return (
               <div className="space-y-4">
@@ -525,16 +566,16 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                     <p className="text-xs text-muted-foreground">Expenses</p>
                   </div>
                   <div className="bg-muted/50 rounded-lg p-3 text-center">
-                    <p className="text-lg font-bold tabular-nums">{startingBalance.toFixed(2)}</p>
-                    <p className="text-xs text-muted-foreground">Current Bal</p>
+                    <p className="text-lg font-bold tabular-nums">{hasStatementBalance && firstStmtBal != null ? firstStmtBal.toFixed(2) : startingBalance.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">{hasStatementBalance ? "First Bal" : "Current Bal"}</p>
                   </div>
                   <div
-                    className={`rounded-lg p-3 text-center ${adjustBalance ? (finalBalance >= startingBalance ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-red-50 dark:bg-red-950/30") : "bg-muted/50"}`}
+                    className={`rounded-lg p-3 text-center ${hasStatementBalance ? "bg-muted/50" : adjustBalance ? (finalBalance >= startingBalance ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-red-50 dark:bg-red-950/30") : "bg-muted/50"}`}
                   >
-                    <p className={`text-lg font-bold tabular-nums ${adjustBalance ? (finalBalance >= startingBalance ? "text-emerald-600" : "text-red-500") : ""}`}>
-                      {adjustBalance ? finalBalance.toFixed(2) : startingBalance.toFixed(2)}
+                    <p className={`text-lg font-bold tabular-nums ${!hasStatementBalance && adjustBalance ? (finalBalance >= startingBalance ? "text-emerald-600" : "text-red-500") : ""}`}>
+                      {hasStatementBalance && lastStmtBal != null ? lastStmtBal.toFixed(2) : adjustBalance ? finalBalance.toFixed(2) : startingBalance.toFixed(2)}
                     </p>
-                    <p className="text-xs text-muted-foreground">After Import</p>
+                    <p className="text-xs text-muted-foreground">{hasStatementBalance ? "Last Bal" : "After Import"}</p>
                   </div>
                 </div>
 
@@ -574,7 +615,6 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                         <TableHead>Description</TableHead>
                         <TableHead className="w-[90px]">Type</TableHead>
                         <TableHead className="w-[100px] text-right">Amount</TableHead>
-                        {hasStatementBalance && <TableHead className="w-[110px] text-right">Stmt Bal</TableHead>}
                         <TableHead className="w-[110px] text-right">Balance</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -616,11 +656,10 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                               className="h-7 text-sm text-right tabular-nums w-[90px] ml-auto"
                             />
                           </TableCell>
-                          {hasStatementBalance && (
-                            <TableCell className="text-right text-sm tabular-nums text-muted-foreground">{row.statementBalance != null ? row.statementBalance.toFixed(2) : "—"}</TableCell>
-                          )}
-                          <TableCell className={`text-right text-sm tabular-nums font-medium ${(runningBalances.get(row.id) ?? 0) < 0 ? "text-red-500" : "text-muted-foreground"}`}>
-                            {(runningBalances.get(row.id) ?? 0).toFixed(2)}
+                          <TableCell
+                            className={`text-right text-sm tabular-nums font-medium ${hasStatementBalance ? "text-muted-foreground" : (runningBalances.get(row.id) ?? 0) < 0 ? "text-red-500" : "text-muted-foreground"}`}
+                          >
+                            {hasStatementBalance ? (row.statementBalance != null ? row.statementBalance.toFixed(2) : "—") : (runningBalances.get(row.id) ?? 0).toFixed(2)}
                           </TableCell>
                         </TableRow>
                       ))}

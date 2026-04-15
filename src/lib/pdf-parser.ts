@@ -6,6 +6,15 @@
  * Works with DBS/POSB, OCBC, UOB, and most SG/international bank PDFs.
  */
 
+export type BankFormat = "dbs" | "ocbc" | "uob" | "generic";
+
+export const BANK_OPTIONS: { value: BankFormat; label: string }[] = [
+  { value: "dbs", label: "DBS / POSB" },
+  { value: "ocbc", label: "OCBC" },
+  { value: "uob", label: "UOB" },
+  { value: "generic", label: "Other" },
+];
+
 export interface ParsedTransaction {
   date: string; // ISO-ish date string e.g. "2026-03-01"
   description: string;
@@ -30,23 +39,28 @@ export async function extractTextFromPDF(file: File): Promise<string[]> {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
 
-    // Group text items by Y position to reconstruct lines
+    // Group text items by Y position to reconstruct lines (with tolerance for sub-pixel differences)
     const items = content.items as { str: string; transform: number[] }[];
-    const lines = new Map<number, { x: number; text: string }[]>();
+    const Y_TOLERANCE = 3;
+    const lineGroups: { y: number; items: { x: number; text: string }[] }[] = [];
 
     for (const item of items) {
       // transform[5] is Y coordinate (inverted — higher Y = higher on page)
-      const y = Math.round(item.transform[5]);
+      const y = item.transform[5];
       const x = Math.round(item.transform[4]);
-      if (!lines.has(y)) lines.set(y, []);
-      lines.get(y)!.push({ x, text: item.str });
+      let group = lineGroups.find((g) => Math.abs(g.y - y) <= Y_TOLERANCE);
+      if (!group) {
+        group = { y, items: [] };
+        lineGroups.push(group);
+      }
+      group.items.push({ x, text: item.str });
     }
 
     // Sort lines by Y descending (top of page first), then items by X ascending
-    const sortedLines = [...lines.entries()]
-      .sort((a, b) => b[0] - a[0])
-      .map(([, items]) =>
-        items
+    const sortedLines = lineGroups
+      .sort((a, b) => b.y - a.y)
+      .map((g) =>
+        g.items
           .sort((a, b) => a.x - b.x)
           .map((i) => i.text)
           .join(" ")
@@ -77,15 +91,17 @@ const MONTHS: Record<string, string> = {
   dec: "12",
 };
 
-// DD/MM/YYYY or DD-MM-YYYY
-const DATE_DMY = /^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})/;
-// DD MMM YYYY or DD-MMM-YYYY
-const DATE_DMONTHY = /^(\d{1,2})[\s\-](jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[\s\-](\d{2,4})/i;
+// DD/MM/YYYY or DD-MM-YYYY (allow optional spaces around separators)
+const DATE_DMY = /^(\d{1,2})\s*[/\-]\s*(\d{1,2})\s*[/\-]\s*(\d{4})/;
+// DD MMM YYYY or DD-MMM-YYYY (allow multiple spaces/dashes)
+const DATE_DMONTHY = /^(\d{1,2})[\s\-]+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[\s\-]+(\d{2,4})/i;
+// DD MMM without year (common in DBS/POSB statements)
+const DATE_DMONTH_NOYEAR = /^(\d{1,2})[\s\-]+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*/i;
 // YYYY-MM-DD
 const DATE_ISO = /^(\d{4})-(\d{2})-(\d{2})/;
 
 /** Try to parse a date from the beginning of a string. Returns YYYY-MM-DD or null. */
-function parseDate(text: string): string | null {
+function parseDate(text: string, defaultYear?: number): string | null {
   const trimmed = text.trim();
 
   let m = trimmed.match(DATE_DMY);
@@ -109,7 +125,37 @@ function parseDate(text: string): string | null {
   m = trimmed.match(DATE_ISO);
   if (m) return `${m[1]}-${m[2]}-${m[3]}`;
 
+  // DD MMM without year (needs defaultYear)
+  if (defaultYear) {
+    m = trimmed.match(DATE_DMONTH_NOYEAR);
+    if (m) {
+      const day = m[1].padStart(2, "0");
+      const month = MONTHS[m[2].toLowerCase().slice(0, 3)] || "01";
+      return `${defaultYear}-${month}-${day}`;
+    }
+  }
+
   return null;
+}
+
+/** Strip any date prefix from a line. */
+function stripDatePrefix(line: string): string {
+  return line
+    .replace(/^\d{1,2}\s*[/\-]\s*\d{1,2}\s*[/\-]\s*\d{4}\s*/, "")
+    .replace(/^\d{1,2}[\s\-]+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(?:[\s\-]+\d{2,4})?\s*/i, "")
+    .replace(/^\d{4}-\d{2}-\d{2}\s*/, "")
+    .trim();
+}
+
+/** Extract the statement year from PDF text header. */
+function extractStatementYear(allText: string): number {
+  // Look for a 4-digit year in the first ~20 lines (statement header area)
+  const headerLines = allText.split("\n").slice(0, 30);
+  for (const line of headerLines) {
+    const m = line.match(/\b(20\d{2})\b/);
+    if (m) return parseInt(m[1]);
+  }
+  return new Date().getFullYear();
 }
 
 // ─── Amount Parsing ───────────────────────────────────────────
@@ -194,13 +240,16 @@ function cleanDescription(lines: string[]): { description: string; notes: string
  * Uses the Balance column to determine INCOME vs EXPENSE:
  * if balance increased from previous → INCOME, if decreased → EXPENSE.
  * Amount is derived from the balance difference for accuracy.
+ * Handles multiple transactions on the same date (date only shown once).
  */
 function parseDBS(allText: string): ParsedTransaction[] {
   const transactions: ParsedTransaction[] = [];
   const lines = allText.split("\n");
+  const statementYear = extractStatementYear(allText);
 
   let previousBalance: number | null = null;
   let currentDate: string | null = null;
+  let lastDate: string | null = null; // Track last used date for same-date transactions
   let currentDescLines: string[] = [];
   let currentAmounts: number[] = [];
 
@@ -242,6 +291,7 @@ function parseDBS(allText: string): ParsedTransaction[] {
         });
       }
     }
+    lastDate = currentDate || lastDate;
     currentDate = null;
     currentDescLines = [];
     currentAmounts = [];
@@ -261,7 +311,7 @@ function parseDBS(allText: string): ParsedTransaction[] {
     if (/balance carried forward/i.test(line)) continue;
     if (isNoiseLine(line)) continue;
 
-    const date = parseDate(line);
+    const date = parseDate(line, statementYear);
     if (date) {
       flushTransaction();
       currentDate = date;
@@ -271,23 +321,41 @@ function parseDBS(allText: string): ParsedTransaction[] {
         currentAmounts = amounts;
       }
 
-      const afterDate = line.replace(DATE_DMY, "").trim();
-      const descPart = afterDate.replace(AMOUNT_RE, "").trim();
+      const descPart = stripDatePrefix(line).replace(AMOUNT_RE, "").trim();
       if (descPart) {
         currentDescLines.push(descPart);
       }
-    } else if (currentDate) {
+    } else if (currentDate || lastDate) {
       const amounts = extractAmounts(line);
       const textWithoutAmounts = line.replace(AMOUNT_RE, "").trim();
 
-      if (amounts.length > 0 && currentAmounts.length === 0) {
+      // Detect a new transaction on the same date:
+      // If this line has >= 2 amounts (transaction amount + balance)
+      // and we already collected >= 2 amounts for the current transaction,
+      // this is a separate transaction sharing the same date.
+      if (amounts.length >= 2 && currentAmounts.length >= 2) {
+        flushTransaction();
+        currentDate = lastDate; // Reuse the last date
         currentAmounts = amounts;
+        if (textWithoutAmounts && !isNoiseLine(textWithoutAmounts)) {
+          currentDescLines.push(textWithoutAmounts);
+        }
+      } else if (amounts.length > 0 && currentAmounts.length === 0) {
+        // First amounts for this transaction
+        if (!currentDate) currentDate = lastDate;
+        currentAmounts = amounts;
+        if (textWithoutAmounts && !isNoiseLine(textWithoutAmounts)) {
+          currentDescLines.push(textWithoutAmounts);
+        }
       } else if (amounts.length > 0) {
         currentAmounts.push(...amounts);
-      }
-
-      if (textWithoutAmounts && !isNoiseLine(textWithoutAmounts)) {
-        currentDescLines.push(textWithoutAmounts);
+        if (textWithoutAmounts && !isNoiseLine(textWithoutAmounts)) {
+          currentDescLines.push(textWithoutAmounts);
+        }
+      } else {
+        if (textWithoutAmounts && !isNoiseLine(textWithoutAmounts)) {
+          currentDescLines.push(textWithoutAmounts);
+        }
       }
     }
   }
@@ -306,6 +374,7 @@ function parseDBS(allText: string): ParsedTransaction[] {
 function parseGeneric(allText: string): ParsedTransaction[] {
   const transactions: ParsedTransaction[] = [];
   const lines = allText.split("\n");
+  const statementYear = extractStatementYear(allText);
 
   let currentDate: string | null = null;
   let currentDescLines: string[] = [];
@@ -337,7 +406,7 @@ function parseGeneric(allText: string): ParsedTransaction[] {
   for (const line of lines) {
     if (isNoiseLine(line)) continue;
 
-    const date = parseDate(line);
+    const date = parseDate(line, statementYear);
     if (date) {
       flushTransaction();
       currentDate = date;
@@ -345,7 +414,7 @@ function parseGeneric(allText: string): ParsedTransaction[] {
       const amounts = extractAmounts(line);
       if (amounts.length > 0) currentAmounts = amounts;
 
-      const descPart = line.replace(DATE_DMY, "").replace(DATE_DMONTHY, "").replace(DATE_ISO, "").replace(AMOUNT_RE, "").trim();
+      const descPart = stripDatePrefix(line).replace(AMOUNT_RE, "").trim();
       if (descPart) currentDescLines.push(descPart);
     } else if (currentDate) {
       const amounts = extractAmounts(line);
@@ -378,14 +447,16 @@ function parseGeneric(allText: string): ParsedTransaction[] {
 // ─── Main Entry Point ─────────────────────────────────────────
 
 /** Parse a bank statement PDF and extract transactions. */
-export async function parseBankStatementPDF(file: File): Promise<ParsedTransaction[]> {
+export async function parseBankStatementPDF(file: File, bank: BankFormat = "generic"): Promise<ParsedTransaction[]> {
   const pages = await extractTextFromPDF(file);
   const allText = pages.join("\n");
 
-  // Detect bank for specialized parsing
-  if (/dbs|posb/i.test(allText)) {
-    return parseDBS(allText);
+  switch (bank) {
+    case "dbs":
+      return parseDBS(allText);
+    case "ocbc":
+    case "uob":
+    default:
+      return parseGeneric(allText);
   }
-
-  return parseGeneric(allText);
 }
