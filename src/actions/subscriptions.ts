@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getViewUserId } from "@/lib/partner-view";
-import { getEncryptionKey, encrypt, decrypt } from "@/lib/encryption";
+import { getEncryptionKey, encrypt, decrypt, encryptAmount, decryptAmount } from "@/lib/encryption";
 
 const subscriptionSchema = z.object({
   name: z.string().min(1),
@@ -33,7 +33,7 @@ export async function getSubscriptions() {
   return subscriptions.map((s) => ({
     id: s.id,
     name: decrypt(s.name, encKey),
-    amount: Number(s.amount),
+    amount: decryptAmount(s.amount, encKey),
     currency: s.currency,
     frequency: s.frequency,
     nextBillingDate: s.nextBillingDate.toISOString(),
@@ -57,7 +57,7 @@ export async function createSubscription(data: z.input<typeof subscriptionSchema
     data: {
       userId: session.user.id,
       name: encrypt(parsed.name, encKey),
-      amount: parsed.amount,
+      amount: encryptAmount(parsed.amount, encKey),
       currency: parsed.currency,
       frequency: parsed.frequency,
       nextBillingDate: parsed.nextBillingDate,
@@ -107,7 +107,7 @@ export async function updateSubscription(id: string, data: z.input<typeof subscr
     where: { id },
     data: {
       name: encrypt(parsed.name, encKey),
-      amount: parsed.amount,
+      amount: encryptAmount(parsed.amount, encKey),
       currency: parsed.currency,
       frequency: parsed.frequency,
       nextBillingDate: parsed.nextBillingDate,

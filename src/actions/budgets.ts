@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
 import { getViewUser } from "@/lib/partner-view";
+import { getEncryptionKey, encrypt, encryptAmount, decryptAmount } from "@/lib/encryption";
 
 const budgetSchema = z.object({
   categoryId: z.string().uuid(),
@@ -23,6 +24,7 @@ const budgetSchema = z.object({
 
 export async function getBudgets() {
   const { id: userId, currency: userCurrency } = await getViewUser();
+  const encKey = await getEncryptionKey();
 
   const rates = await getExchangeRates(userCurrency);
 
@@ -48,9 +50,9 @@ export async function getBudgets() {
       });
 
       const budgetCurrency = budget.currency || userCurrency;
-      const budgetAmount = convertCurrency(Number(budget.amount), budgetCurrency, userCurrency, rates);
+      const budgetAmount = convertCurrency(decryptAmount(budget.amount, encKey), budgetCurrency, userCurrency, rates);
 
-      const spent = transactions.reduce((sum, t) => sum + convertCurrency(Number(t.amount), t.account.currency, userCurrency, rates), 0);
+      const spent = transactions.reduce((sum, t) => sum + convertCurrency(decryptAmount(t.amount, encKey), t.account.currency, userCurrency, rates), 0);
 
       return {
         id: budget.id,
@@ -77,12 +79,14 @@ export async function getBudgets() {
 export async function createBudget(data: z.input<typeof budgetSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const parsed = budgetSchema.parse(data);
 
   const budget = await db.budget.create({
     data: {
       ...parsed,
+      amount: encryptAmount(parsed.amount, encKey),
       userId: session.user.id,
     },
   });
@@ -100,6 +104,7 @@ export async function checkBudgetAchievements() {
 export async function updateBudget(id: string, data: z.input<typeof budgetSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const existing = await db.budget.findFirst({
     where: { id, userId: session.user.id },
@@ -110,7 +115,7 @@ export async function updateBudget(id: string, data: z.input<typeof budgetSchema
 
   await db.budget.update({
     where: { id },
-    data: parsed,
+    data: { ...parsed, amount: encryptAmount(parsed.amount, encKey) },
   });
 
   revalidatePath("/");

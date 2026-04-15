@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getViewUserId } from "@/lib/partner-view";
-import { getEncryptionKey, encrypt, decrypt } from "@/lib/encryption";
+import { getEncryptionKey, encrypt, decrypt, encryptAmount, decryptAmount } from "@/lib/encryption";
 
 const accountSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -32,12 +32,12 @@ export async function getAccounts() {
     id: a.id,
     name: decrypt(a.name, encKey),
     type: a.type,
-    balance: Number(a.balance),
-    reservedAmount: Number(a.reservedAmount),
+    balance: decryptAmount(a.balance, encKey),
+    reservedAmount: decryptAmount(a.reservedAmount, encKey),
     currency: a.currency,
     color: a.color,
     icon: a.icon,
-    creditLimit: a.creditLimit ? Number(a.creditLimit) : null,
+    creditLimit: a.creditLimit ? decryptAmount(a.creditLimit, encKey) : null,
     repaymentDay: a.repaymentDay,
   }));
 }
@@ -52,6 +52,9 @@ export async function createAccount(data: z.infer<typeof accountSchema>) {
   const account = await db.financialAccount.create({
     data: {
       ...parsed,
+      balance: encryptAmount(parsed.balance, encKey),
+      reservedAmount: encryptAmount(parsed.reservedAmount, encKey),
+      creditLimit: parsed.creditLimit != null ? encryptAmount(parsed.creditLimit, encKey) : null,
       name: encrypt(parsed.name, encKey),
       userId: session.user.id,
     },
@@ -83,7 +86,7 @@ export async function updateAccount(id: string, data: z.infer<typeof accountSche
 
   const parsed = accountSchema.parse(data);
 
-  const oldBalance = Number(existing.balance);
+  const oldBalance = decryptAmount(existing.balance, encKey);
   const newBalance = parsed.balance;
   const diff = newBalance - oldBalance;
 
@@ -94,7 +97,7 @@ export async function updateAccount(id: string, data: z.infer<typeof accountSche
         userId: session.user.id,
         accountId: id,
         type: diff > 0 ? "INCOME" : "EXPENSE",
-        amount: Math.abs(diff),
+        amount: encryptAmount(Math.abs(diff), encKey),
         description: encrypt("Balance adjustment", encKey),
         date: new Date(),
         notes: encrypt(`Adjusted from ${oldBalance.toFixed(2)} to ${newBalance.toFixed(2)}`, encKey),
@@ -105,7 +108,13 @@ export async function updateAccount(id: string, data: z.infer<typeof accountSche
 
   await db.financialAccount.update({
     where: { id },
-    data: { ...parsed, name: encrypt(parsed.name, encKey) },
+    data: {
+      ...parsed,
+      balance: encryptAmount(parsed.balance, encKey),
+      reservedAmount: encryptAmount(parsed.reservedAmount, encKey),
+      creditLimit: parsed.creditLimit != null ? encryptAmount(parsed.creditLimit, encKey) : null,
+      name: encrypt(parsed.name, encKey),
+    },
   });
 
   revalidatePath("/");

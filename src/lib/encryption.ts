@@ -75,6 +75,32 @@ export function isEncrypted(value: string): boolean {
   return value.startsWith(ENCRYPTED_PREFIX);
 }
 
+// ─── Amount Helpers ──────────────────────────────────────────────
+
+/** Encrypt a numeric amount as an encrypted string. */
+export function encryptAmount(value: number, keyBase64: string): string {
+  return encrypt(String(value), keyBase64);
+}
+
+/**
+ * Decrypt an encrypted amount string back to a number.
+ * Handles: encrypted strings, plain number strings (migration safety), and raw numbers.
+ * Returns 0 if decryption fails.
+ */
+export function decryptAmount(value: string | number | unknown, keyBase64: string): number {
+  if (typeof value === "number") return value;
+  if (typeof value !== "string" || value.length === 0) return 0;
+  if (isEncrypted(value)) {
+    const decrypted = decrypt(value, keyBase64);
+    if (decrypted === "[Encrypted]") return 0;
+    const num = parseFloat(decrypted);
+    return isNaN(num) ? 0 : num;
+  }
+  // Not encrypted — plain number string (migration safety)
+  const num = parseFloat(value);
+  return isNaN(num) ? 0 : num;
+}
+
 // ─── Bulk Field Helpers ──────────────────────────────────────────
 
 /**
@@ -151,6 +177,36 @@ export async function getEncryptionKey(): Promise<string> {
   return key;
 }
 
+/** Derive a server master key from AUTH_SECRET for storing user encryption keys in DB. */
+function getServerMasterKey(): string {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) throw new Error("AUTH_SECRET not configured");
+  return pbkdf2Sync(secret, "server-master-key", PBKDF2_ITERATIONS, KEY_LENGTH, "sha512").toString("base64");
+}
+
+/** Encrypt a user's encryption key with the server master key and store it in the DB. */
+export async function storeEncryptionKey(userId: string, userKey: string) {
+  const { db } = await import("@/lib/db");
+  const masterKey = getServerMasterKey();
+  const encryptedKey = encrypt(userKey, masterKey);
+  await db.user.update({
+    where: { id: userId },
+    data: { storedEncKey: encryptedKey },
+  });
+}
+
+/** Retrieve another user's encryption key (e.g. for partner view in couple feature). */
+export async function getEncryptionKeyForUser(userId: string): Promise<string> {
+  const { db } = await import("@/lib/db");
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { storedEncKey: true },
+  });
+  if (!user?.storedEncKey) throw new Error("Partner encryption key not available. Partner needs to log in.");
+  const masterKey = getServerMasterKey();
+  return decrypt(user.storedEncKey, masterKey);
+}
+
 /**
  * Re-encrypt all user data when password changes.
  * Reads all records, decrypts with old key, encrypts with new key, writes back.
@@ -159,11 +215,7 @@ export async function reEncryptUserData(userId: string, oldKey: string, newKey: 
   const { db } = await import("@/lib/db");
 
   // Helper to re-encrypt specified fields across all records
-  async function reEncryptTable<T extends Record<string, unknown>>(
-    records: (T & { id: string })[],
-    fields: string[],
-    updateFn: (id: string, data: Record<string, unknown>) => Promise<unknown>,
-  ) {
+  async function reEncryptTable<T extends Record<string, unknown>>(records: (T & { id: string })[], fields: string[], updateFn: (id: string, data: Record<string, unknown>) => Promise<unknown>) {
     for (const record of records) {
       const updates: Record<string, unknown> = {};
       let hasChanges = false;
@@ -183,34 +235,37 @@ export async function reEncryptUserData(userId: string, oldKey: string, newKey: 
 
   // Re-encrypt each table
   const financialAccounts = await db.financialAccount.findMany({ where: { userId } });
-  await reEncryptTable(financialAccounts, ["name"], (id, data) => db.financialAccount.update({ where: { id }, data }));
+  await reEncryptTable(financialAccounts, ["name", "balance", "reservedAmount", "creditLimit"], (id, data) => db.financialAccount.update({ where: { id }, data }));
 
   const transactions = await db.transaction.findMany({ where: { userId } });
-  await reEncryptTable(transactions, ["description", "notes"], (id, data) => db.transaction.update({ where: { id }, data }));
+  await reEncryptTable(transactions, ["description", "notes", "amount"], (id, data) => db.transaction.update({ where: { id }, data }));
 
   const investments = await db.investment.findMany({ where: { userId } });
-  await reEncryptTable(investments, ["symbol", "name", "notes"], (id, data) => db.investment.update({ where: { id }, data }));
+  await reEncryptTable(investments, ["symbol", "name", "notes", "quantity", "buyPrice", "currentPrice"], (id, data) => db.investment.update({ where: { id }, data }));
 
   const goals = await db.goal.findMany({ where: { userId } });
-  await reEncryptTable(goals, ["name"], (id, data) => db.goal.update({ where: { id }, data }));
+  await reEncryptTable(goals, ["name", "targetAmount", "currentAmount", "interestRate", "monthlyContribution"], (id, data) => db.goal.update({ where: { id }, data }));
 
   const debts = await db.debt.findMany({ where: { userId } });
-  await reEncryptTable(debts, ["name", "lender", "notes"], (id, data) => db.debt.update({ where: { id }, data }));
+  await reEncryptTable(debts, ["name", "lender", "notes", "originalAmount", "remainingAmount", "interestRate", "minimumPayment"], (id, data) => db.debt.update({ where: { id }, data }));
 
   const installments = await db.installment.findMany({ where: { userId } });
-  await reEncryptTable(installments, ["name", "merchant", "notes"], (id, data) => db.installment.update({ where: { id }, data }));
+  await reEncryptTable(installments, ["name", "merchant", "notes", "totalAmount", "monthlyPayment", "interestRate"], (id, data) => db.installment.update({ where: { id }, data }));
 
   const assets = await db.asset.findMany({ where: { userId } });
-  await reEncryptTable(assets, ["name", "location", "description", "notes"], (id, data) => db.asset.update({ where: { id }, data }));
+  await reEncryptTable(assets, ["name", "location", "description", "notes", "purchasePrice", "currentValue"], (id, data) => db.asset.update({ where: { id }, data }));
 
   const subscriptions = await db.subscription.findMany({ where: { userId } });
-  await reEncryptTable(subscriptions, ["name", "notes", "url"], (id, data) => db.subscription.update({ where: { id }, data }));
+  await reEncryptTable(subscriptions, ["name", "notes", "url", "amount"], (id, data) => db.subscription.update({ where: { id }, data }));
 
   const wishlistItems = await db.wishlistItem.findMany({ where: { userId } });
-  await reEncryptTable(wishlistItems, ["name", "notes", "url"], (id, data) => db.wishlistItem.update({ where: { id }, data }));
+  await reEncryptTable(wishlistItems, ["name", "notes", "url", "estimatedCost"], (id, data) => db.wishlistItem.update({ where: { id }, data }));
 
   const tags = await db.tag.findMany({ where: { userId } });
   await reEncryptTable(tags, ["name"], (id, data) => db.tag.update({ where: { id }, data }));
+
+  const netWorthSnapshots = await db.netWorthSnapshot.findMany({ where: { userId } });
+  await reEncryptTable(netWorthSnapshots, ["netWorth"], (id, data) => db.netWorthSnapshot.update({ where: { id }, data }));
 }
 
 /**
@@ -220,11 +275,7 @@ export async function reEncryptUserData(userId: string, oldKey: string, newKey: 
 export async function encryptExistingData(userId: string, key: string) {
   const { db } = await import("@/lib/db");
 
-  async function encryptTable<T extends Record<string, unknown>>(
-    records: (T & { id: string })[],
-    fields: string[],
-    updateFn: (id: string, data: Record<string, unknown>) => Promise<unknown>,
-  ) {
+  async function encryptTable<T extends Record<string, unknown>>(records: (T & { id: string })[], fields: string[], updateFn: (id: string, data: Record<string, unknown>) => Promise<unknown>) {
     for (const record of records) {
       const updates: Record<string, unknown> = {};
       let hasChanges = false;
@@ -242,34 +293,37 @@ export async function encryptExistingData(userId: string, key: string) {
   }
 
   const financialAccounts = await db.financialAccount.findMany({ where: { userId } });
-  await encryptTable(financialAccounts, ["name"], (id, data) => db.financialAccount.update({ where: { id }, data }));
+  await encryptTable(financialAccounts, ["name", "balance", "reservedAmount", "creditLimit"], (id, data) => db.financialAccount.update({ where: { id }, data }));
 
   const transactions = await db.transaction.findMany({ where: { userId } });
-  await encryptTable(transactions, ["description", "notes"], (id, data) => db.transaction.update({ where: { id }, data }));
+  await encryptTable(transactions, ["description", "notes", "amount"], (id, data) => db.transaction.update({ where: { id }, data }));
 
   const investments = await db.investment.findMany({ where: { userId } });
-  await encryptTable(investments, ["symbol", "name", "notes"], (id, data) => db.investment.update({ where: { id }, data }));
+  await encryptTable(investments, ["symbol", "name", "notes", "quantity", "buyPrice", "currentPrice"], (id, data) => db.investment.update({ where: { id }, data }));
 
   const goals = await db.goal.findMany({ where: { userId } });
-  await encryptTable(goals, ["name"], (id, data) => db.goal.update({ where: { id }, data }));
+  await encryptTable(goals, ["name", "targetAmount", "currentAmount", "interestRate", "monthlyContribution"], (id, data) => db.goal.update({ where: { id }, data }));
 
   const debts = await db.debt.findMany({ where: { userId } });
-  await encryptTable(debts, ["name", "lender", "notes"], (id, data) => db.debt.update({ where: { id }, data }));
+  await encryptTable(debts, ["name", "lender", "notes", "originalAmount", "remainingAmount", "interestRate", "minimumPayment"], (id, data) => db.debt.update({ where: { id }, data }));
 
   const installments = await db.installment.findMany({ where: { userId } });
-  await encryptTable(installments, ["name", "merchant", "notes"], (id, data) => db.installment.update({ where: { id }, data }));
+  await encryptTable(installments, ["name", "merchant", "notes", "totalAmount", "monthlyPayment", "interestRate"], (id, data) => db.installment.update({ where: { id }, data }));
 
   const assets = await db.asset.findMany({ where: { userId } });
-  await encryptTable(assets, ["name", "location", "description", "notes"], (id, data) => db.asset.update({ where: { id }, data }));
+  await encryptTable(assets, ["name", "location", "description", "notes", "purchasePrice", "currentValue"], (id, data) => db.asset.update({ where: { id }, data }));
 
   const subscriptions = await db.subscription.findMany({ where: { userId } });
-  await encryptTable(subscriptions, ["name", "notes", "url"], (id, data) => db.subscription.update({ where: { id }, data }));
+  await encryptTable(subscriptions, ["name", "notes", "url", "amount"], (id, data) => db.subscription.update({ where: { id }, data }));
 
   const wishlistItems = await db.wishlistItem.findMany({ where: { userId } });
-  await encryptTable(wishlistItems, ["name", "notes", "url"], (id, data) => db.wishlistItem.update({ where: { id }, data }));
+  await encryptTable(wishlistItems, ["name", "notes", "url", "estimatedCost"], (id, data) => db.wishlistItem.update({ where: { id }, data }));
 
   const tags = await db.tag.findMany({ where: { userId } });
   await encryptTable(tags, ["name"], (id, data) => db.tag.update({ where: { id }, data }));
+
+  const netWorthSnapshots = await db.netWorthSnapshot.findMany({ where: { userId } });
+  await encryptTable(netWorthSnapshots, ["netWorth"], (id, data) => db.netWorthSnapshot.update({ where: { id }, data }));
 
   // Mark user as encrypted
   await db.user.update({

@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getViewUserId } from "@/lib/partner-view";
-import { getEncryptionKey, encrypt, decrypt } from "@/lib/encryption";
+import { getEncryptionKey, encrypt, decrypt, encryptAmount, decryptAmount } from "@/lib/encryption";
 
 const transactionSchema = z.object({
   accountId: z.string().uuid(),
@@ -48,7 +48,7 @@ export async function getTransactions(filters?: { type?: string; accountId?: str
   return transactions.map((t) => ({
     id: t.id,
     type: t.type,
-    amount: Number(t.amount),
+    amount: decryptAmount(t.amount, encKey),
     description: decrypt(t.description, encKey),
     date: t.date.toISOString(),
     notes: t.notes ? decrypt(t.notes, encKey) : t.notes,
@@ -88,7 +88,7 @@ export async function createTransaction(data: z.input<typeof transactionSchema>)
         userId: session.user.id,
         accountId: parsed.accountId,
         type: "TRANSFER",
-        amount: parsed.amount,
+        amount: encryptAmount(parsed.amount, encKey),
         description: encrypt(parsed.description || `Transfer to ${decrypt(toAccount.name, encKey)}`, encKey),
         date: parsed.date,
         notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
@@ -102,7 +102,7 @@ export async function createTransaction(data: z.input<typeof transactionSchema>)
         userId: session.user.id,
         accountId: parsed.transferToAccountId,
         type: "TRANSFER",
-        amount: parsed.amount,
+        amount: encryptAmount(parsed.amount, encKey),
         description: encrypt(parsed.description || `Transfer from ${decrypt(account.name, encKey)}`, encKey),
         date: parsed.date,
         notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
@@ -111,13 +111,15 @@ export async function createTransaction(data: z.input<typeof transactionSchema>)
     });
 
     // Update balances
+    const srcBalance = decryptAmount(account.balance, encKey);
     await db.financialAccount.update({
       where: { id: parsed.accountId },
-      data: { balance: { decrement: parsed.amount } },
+      data: { balance: encryptAmount(srcBalance - parsed.amount, encKey) },
     });
+    const destBalance = decryptAmount(toAccount.balance, encKey);
     await db.financialAccount.update({
       where: { id: parsed.transferToAccountId },
-      data: { balance: { increment: parsed.amount } },
+      data: { balance: encryptAmount(destBalance + parsed.amount, encKey) },
     });
 
     revalidatePath("/");
@@ -130,6 +132,7 @@ export async function createTransaction(data: z.input<typeof transactionSchema>)
   const transaction = await db.transaction.create({
     data: {
       ...transactionData,
+      amount: encryptAmount(transactionData.amount, encKey),
       description: encrypt(transactionData.description, encKey),
       notes: transactionData.notes ? encrypt(transactionData.notes, encKey) : null,
       userId: session.user.id,
@@ -138,10 +141,11 @@ export async function createTransaction(data: z.input<typeof transactionSchema>)
   });
 
   // Update account balance
+  const currentBalance = decryptAmount(account.balance, encKey);
   const balanceChange = parsed.type === "INCOME" ? parsed.amount : -parsed.amount;
   await db.financialAccount.update({
     where: { id: parsed.accountId },
-    data: { balance: { increment: balanceChange } },
+    data: { balance: encryptAmount(currentBalance + balanceChange, encKey) },
   });
 
   // Auto-contribute to linked goals when adding income to savings/investment accounts
@@ -154,15 +158,16 @@ export async function createTransaction(data: z.input<typeof transactionSchema>)
     });
 
     for (const goal of linkedGoals) {
-      const remaining = Math.max(Number(goal.targetAmount) - Number(goal.currentAmount), 0);
+      const remaining = Math.max(decryptAmount(goal.targetAmount, encKey) - decryptAmount(goal.currentAmount, encKey), 0);
       if (remaining > 0) {
         const contribution = Math.min(parsed.amount, remaining);
+        const newAmount = decryptAmount(goal.currentAmount, encKey) + contribution;
         const updated = await db.goal.update({
           where: { id: goal.id },
-          data: { currentAmount: { increment: contribution } },
+          data: { currentAmount: encryptAmount(newAmount, encKey) },
         });
 
-        if (Number(updated.currentAmount) >= Number(updated.targetAmount)) {
+        if (decryptAmount(updated.currentAmount, encKey) >= decryptAmount(updated.targetAmount, encKey)) {
           const { checkAchievements } = await import("@/actions/gamification");
           await checkAchievements("goal_complete");
         }
@@ -194,23 +199,30 @@ export async function updateTransaction(id: string, data: z.input<typeof transac
   const parsed = transactionSchema.parse(data);
 
   // Reverse old balance change
-  const oldBalanceChange = existing.type === "INCOME" ? -Number(existing.amount) : Number(existing.amount);
+  const oldAccount = await db.financialAccount.findUnique({ where: { id: existing.accountId } });
+  const oldAccountBalance = decryptAmount(oldAccount!.balance, encKey);
+  const oldAmount = decryptAmount(existing.amount, encKey);
+  const oldBalanceChange = existing.type === "INCOME" ? -oldAmount : oldAmount;
   await db.financialAccount.update({
     where: { id: existing.accountId },
-    data: { balance: { increment: oldBalanceChange } },
+    data: { balance: encryptAmount(oldAccountBalance + oldBalanceChange, encKey) },
   });
 
   // Apply new balance change
+  const newAccount =
+    parsed.accountId === existing.accountId ? await db.financialAccount.findUnique({ where: { id: parsed.accountId } }) : await db.financialAccount.findUnique({ where: { id: parsed.accountId } });
+  const newAccountBalance = decryptAmount(newAccount!.balance, encKey);
   const newBalanceChange = parsed.type === "INCOME" ? parsed.amount : -parsed.amount;
   await db.financialAccount.update({
     where: { id: parsed.accountId },
-    data: { balance: { increment: newBalanceChange } },
+    data: { balance: encryptAmount(newAccountBalance + newBalanceChange, encKey) },
   });
 
   await db.transaction.update({
     where: { id },
     data: {
       ...parsed,
+      amount: encryptAmount(parsed.amount, encKey),
       description: encrypt(parsed.description, encKey),
       notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
       categoryId: parsed.categoryId || null,
@@ -224,6 +236,7 @@ export async function updateTransaction(id: string, data: z.input<typeof transac
 export async function deleteTransaction(id: string) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const transaction = await db.transaction.findFirst({
     where: { id, userId: session.user.id },
@@ -236,30 +249,33 @@ export async function deleteTransaction(id: string) {
       where: { transferId: transaction.transferId, userId: session.user.id },
     });
     for (const t of paired) {
-      // For the source (first in pair), add back; for dest (second), subtract
-      // We identify by: if t.id === id, this is the one user clicked delete on
-      // The paired one is the other
+      const acct = await db.financialAccount.findUnique({ where: { id: t.accountId } });
+      const acctBalance = decryptAmount(acct!.balance, encKey);
+      const txAmount = decryptAmount(t.amount, encKey);
       if (t.id === id) {
         // This is source - add balance back
         await db.financialAccount.update({
           where: { id: t.accountId },
-          data: { balance: { increment: Number(t.amount) } },
+          data: { balance: encryptAmount(acctBalance + txAmount, encKey) },
         });
       } else {
         // This is destination - subtract balance
         await db.financialAccount.update({
           where: { id: t.accountId },
-          data: { balance: { decrement: Number(t.amount) } },
+          data: { balance: encryptAmount(acctBalance - txAmount, encKey) },
         });
       }
     }
     await db.transaction.deleteMany({ where: { transferId: transaction.transferId, userId: session.user.id } });
   } else {
     // Reverse balance change
-    const balanceChange = transaction.type === "INCOME" ? -Number(transaction.amount) : Number(transaction.amount);
+    const acct = await db.financialAccount.findUnique({ where: { id: transaction.accountId } });
+    const acctBalance = decryptAmount(acct!.balance, encKey);
+    const txAmount = decryptAmount(transaction.amount, encKey);
+    const balanceChange = transaction.type === "INCOME" ? -txAmount : txAmount;
     await db.financialAccount.update({
       where: { id: transaction.accountId },
-      data: { balance: { increment: balanceChange } },
+      data: { balance: encryptAmount(acctBalance + balanceChange, encKey) },
     });
 
     await db.transaction.delete({ where: { id } });
@@ -320,7 +336,7 @@ export async function importTransactions(rows: z.input<typeof importRowSchema>[]
           accountId: parsed.accountId,
           categoryId,
           type: parsed.type,
-          amount: parsed.amount,
+          amount: encryptAmount(parsed.amount, encKey),
           description: encrypt(parsed.description, encKey),
           date: new Date(parsed.date),
           notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
@@ -337,9 +353,11 @@ export async function importTransactions(rows: z.input<typeof importRowSchema>[]
 
   // Batch update account balances
   for (const [accountId, change] of balanceChanges) {
+    const acct = await db.financialAccount.findUnique({ where: { id: accountId } });
+    const currentBalance = decryptAmount(acct!.balance, encKey);
     await db.financialAccount.update({
       where: { id: accountId },
-      data: { balance: { increment: change } },
+      data: { balance: encryptAmount(currentBalance + change, encKey) },
     });
   }
 

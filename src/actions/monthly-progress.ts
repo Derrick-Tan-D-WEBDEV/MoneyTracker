@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
 import { getViewUser } from "@/lib/partner-view";
+import { getEncryptionKey, decryptAmount } from "@/lib/encryption";
 
 export interface MonthlyProgress {
   // Debts
@@ -36,6 +37,7 @@ export interface MonthlyProgress {
 
 export async function getMonthlyProgress(): Promise<MonthlyProgress> {
   const { id: userId, currency: userCurrency } = await getViewUser();
+  const encKey = await getEncryptionKey();
 
   const rates = await getExchangeRates(userCurrency);
   const now = new Date();
@@ -46,10 +48,10 @@ export async function getMonthlyProgress(): Promise<MonthlyProgress> {
     where: { userId, isPaidOff: false },
   });
 
-  const totalDebtRemaining = debts.reduce((s, d) => s + convertCurrency(Number(d.remainingAmount), d.currency, userCurrency, rates), 0);
+  const totalDebtRemaining = debts.reduce((s, d) => s + convertCurrency(decryptAmount(d.remainingAmount, encKey), d.currency, userCurrency, rates), 0);
 
   // Estimate debt paid this month: sum of minimum payments
-  const debtPaidThisMonth = debts.reduce((s, d) => s + convertCurrency(Number(d.minimumPayment), d.currency, userCurrency, rates), 0);
+  const debtPaidThisMonth = debts.reduce((s, d) => s + convertCurrency(decryptAmount(d.minimumPayment, encKey), d.currency, userCurrency, rates), 0);
 
   // Installments
   const installments = await db.installment.findMany({
@@ -57,7 +59,7 @@ export async function getMonthlyProgress(): Promise<MonthlyProgress> {
     include: { account: true },
   });
 
-  const installmentMonthlyTotal = installments.reduce((s, i) => s + convertCurrency(Number(i.monthlyPayment), i.currency, userCurrency, rates), 0);
+  const installmentMonthlyTotal = installments.reduce((s, i) => s + convertCurrency(decryptAmount(i.monthlyPayment, encKey), i.currency, userCurrency, rates), 0);
 
   const installmentsCompletingSoon = installments.filter((i) => i.totalMonths - i.paidMonths <= 3).length;
 
@@ -66,31 +68,31 @@ export async function getMonthlyProgress(): Promise<MonthlyProgress> {
     where: { userId },
   });
 
-  const activeGoals = goals.filter((g) => Number(g.currentAmount) < Number(g.targetAmount));
-  const totalTargetSum = activeGoals.reduce((s, g) => s + convertCurrency(Number(g.targetAmount), g.currency || userCurrency, userCurrency, rates), 0);
-  const totalCurrentSum = activeGoals.reduce((s, g) => s + convertCurrency(Number(g.currentAmount), g.currency || userCurrency, userCurrency, rates), 0);
+  const activeGoals = goals.filter((g) => decryptAmount(g.currentAmount, encKey) < decryptAmount(g.targetAmount, encKey));
+  const totalTargetSum = activeGoals.reduce((s, g) => s + convertCurrency(decryptAmount(g.targetAmount, encKey), g.currency || userCurrency, userCurrency, rates), 0);
+  const totalCurrentSum = activeGoals.reduce((s, g) => s + convertCurrency(decryptAmount(g.currentAmount, encKey), g.currency || userCurrency, userCurrency, rates), 0);
   const totalGoalProgress = totalTargetSum > 0 ? (totalCurrentSum / totalTargetSum) * 100 : 0;
-  const goalContributionsThisMonth = activeGoals.reduce((s, g) => s + convertCurrency(Number(g.monthlyContribution), g.currency || userCurrency, userCurrency, rates), 0);
+  const goalContributionsThisMonth = activeGoals.reduce((s, g) => s + convertCurrency(decryptAmount(g.monthlyContribution, encKey), g.currency || userCurrency, userCurrency, rates), 0);
 
   // Savings accounts
   const savingsAccounts = await db.financialAccount.findMany({
     where: { userId, type: "SAVINGS" },
   });
 
-  const totalSavingsBalance = savingsAccounts.reduce((s, a) => s + convertCurrency(Number(a.balance) - Number(a.reservedAmount), a.currency, userCurrency, rates), 0);
+  const totalSavingsBalance = savingsAccounts.reduce((s, a) => s + convertCurrency(decryptAmount(a.balance, encKey) - decryptAmount(a.reservedAmount, encKey), a.currency, userCurrency, rates), 0);
 
   // Assets
   const activeAssets = await db.asset.findMany({
     where: { userId, isSold: false },
   });
 
-  const totalAssetValue = activeAssets.reduce((s, a) => s + convertCurrency(Number(a.currentValue), a.currency, userCurrency, rates), 0);
+  const totalAssetValue = activeAssets.reduce((s, a) => s + convertCurrency(decryptAmount(a.currentValue, encKey), a.currency, userCurrency, rates), 0);
 
   // Project monthly interest from goals with interest rates
   const projectedInterestMonthly = goals.reduce((s, g) => {
-    const rate = Number(g.interestRate);
+    const rate = decryptAmount(g.interestRate, encKey);
     if (rate <= 0) return s;
-    const monthlyInterest = Number(g.currentAmount) * (rate / 100 / 12);
+    const monthlyInterest = decryptAmount(g.currentAmount, encKey) * (rate / 100 / 12);
     return s + convertCurrency(monthlyInterest, g.currency || userCurrency, userCurrency, rates);
   }, 0);
 
@@ -102,7 +104,7 @@ export async function getMonthlyProgress(): Promise<MonthlyProgress> {
     if (d.dueDay && d.dueDay >= today) {
       upcomingBills.push({
         name: d.name,
-        amount: convertCurrency(Number(d.minimumPayment), d.currency, userCurrency, rates),
+        amount: convertCurrency(decryptAmount(d.minimumPayment, encKey), d.currency, userCurrency, rates),
         dueDay: d.dueDay,
         type: "debt",
       });
@@ -115,7 +117,7 @@ export async function getMonthlyProgress(): Promise<MonthlyProgress> {
     if (startDay >= today) {
       upcomingBills.push({
         name: i.name,
-        amount: convertCurrency(Number(i.monthlyPayment), i.currency, userCurrency, rates),
+        amount: convertCurrency(decryptAmount(i.monthlyPayment, encKey), i.currency, userCurrency, rates),
         dueDay: startDay,
         type: "installment",
       });

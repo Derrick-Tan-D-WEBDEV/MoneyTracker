@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
 import { getViewUser, isPartnerView } from "@/lib/partner-view";
-import { getEncryptionKey, decrypt } from "@/lib/encryption";
+import { getEncryptionKey, decrypt, encryptAmount, decryptAmount } from "@/lib/encryption";
 
 export async function getDashboardData() {
   const session = await auth();
@@ -32,18 +32,18 @@ export async function getDashboardData() {
   });
 
   const accountBalance = accounts.reduce((sum, acc) => {
-    const effectiveBalance = Number(acc.balance) - Number(acc.reservedAmount);
+    const effectiveBalance = decryptAmount(acc.balance, encKey) - decryptAmount(acc.reservedAmount, encKey);
     const converted = toUser(effectiveBalance, acc.currency);
     if (acc.type === "CREDIT_CARD") {
       // Balance = available credit; liability = creditLimit - balance
-      const limit = acc.creditLimit ? toUser(Number(acc.creditLimit), acc.currency) : 0;
+      const limit = acc.creditLimit ? toUser(decryptAmount(acc.creditLimit, encKey), acc.currency) : 0;
       return sum - (limit - converted);
     }
     return sum + converted;
   }, 0);
 
   const totalDebt = debts.reduce((sum, d) => {
-    return sum + toUser(Number(d.remainingAmount), d.currency);
+    return sum + toUser(decryptAmount(d.remainingAmount, encKey), d.currency);
   }, 0);
 
   const totalBalance = accountBalance - totalDebt;
@@ -55,8 +55,8 @@ export async function getDashboardData() {
     db.netWorthSnapshot
       .upsert({
         where: { userId_date: { userId, date: today } },
-        update: { netWorth: totalBalance },
-        create: { userId, date: today, netWorth: totalBalance },
+        update: { netWorth: encryptAmount(totalBalance, encKey) },
+        create: { userId, date: today, netWorth: encryptAmount(totalBalance, encKey) },
       })
       .catch(() => {});
   }
@@ -83,13 +83,13 @@ export async function getDashboardData() {
     include: { account: true },
   });
 
-  const currentIncome = currentMonthTransactions.filter((t) => t.type === "INCOME").reduce((sum, t) => sum + toUser(Number(t.amount), t.account.currency), 0);
+  const currentIncome = currentMonthTransactions.filter((t) => t.type === "INCOME").reduce((sum, t) => sum + toUser(decryptAmount(t.amount, encKey), t.account.currency), 0);
 
-  const currentExpenses = currentMonthTransactions.filter((t) => t.type === "EXPENSE").reduce((sum, t) => sum + toUser(Number(t.amount), t.account.currency), 0);
+  const currentExpenses = currentMonthTransactions.filter((t) => t.type === "EXPENSE").reduce((sum, t) => sum + toUser(decryptAmount(t.amount, encKey), t.account.currency), 0);
 
-  const lastIncome = lastMonthTransactions.filter((t) => t.type === "INCOME").reduce((sum, t) => sum + toUser(Number(t.amount), t.account.currency), 0);
+  const lastIncome = lastMonthTransactions.filter((t) => t.type === "INCOME").reduce((sum, t) => sum + toUser(decryptAmount(t.amount, encKey), t.account.currency), 0);
 
-  const lastExpenses = lastMonthTransactions.filter((t) => t.type === "EXPENSE").reduce((sum, t) => sum + toUser(Number(t.amount), t.account.currency), 0);
+  const lastExpenses = lastMonthTransactions.filter((t) => t.type === "EXPENSE").reduce((sum, t) => sum + toUser(decryptAmount(t.amount, encKey), t.account.currency), 0);
 
   // Spending by category
   const spendingByCategory = currentMonthTransactions
@@ -99,7 +99,7 @@ export async function getDashboardData() {
         const catName = t.category!.name;
         const catColor = t.category!.color;
         if (!acc[catName]) acc[catName] = { amount: 0, color: catColor };
-        acc[catName].amount += toUser(Number(t.amount), t.account.currency);
+        acc[catName].amount += toUser(decryptAmount(t.amount, encKey), t.account.currency);
         return acc;
       },
       {} as Record<string, { amount: number; color: string }>,
@@ -118,8 +118,10 @@ export async function getDashboardData() {
 
   const budgetProgress = await Promise.all(
     budgets.map(async (budget) => {
-      const spent = currentMonthTransactions.filter((t) => t.type === "EXPENSE" && t.categoryId === budget.categoryId).reduce((sum, t) => sum + toUser(Number(t.amount), t.account.currency), 0);
-      const limit = toUser(Number(budget.amount), budget.currency || userCurrency);
+      const spent = currentMonthTransactions
+        .filter((t) => t.type === "EXPENSE" && t.categoryId === budget.categoryId)
+        .reduce((sum, t) => sum + toUser(decryptAmount(t.amount, encKey), t.account.currency), 0);
+      const limit = toUser(decryptAmount(budget.amount, encKey), budget.currency || userCurrency);
       return {
         id: budget.id,
         category: budget.category.name,
@@ -136,15 +138,15 @@ export async function getDashboardData() {
     where: { userId },
   });
 
-  const totalInvested = investments.reduce((sum, inv) => sum + toUser(Number(inv.buyPrice) * Number(inv.quantity), inv.currency), 0);
+  const totalInvested = investments.reduce((sum, inv) => sum + toUser(decryptAmount(inv.buyPrice, encKey) * decryptAmount(inv.quantity, encKey), inv.currency), 0);
 
-  const totalCurrentValue = investments.reduce((sum, inv) => sum + toUser(Number(inv.currentPrice) * Number(inv.quantity), inv.currency), 0);
+  const totalCurrentValue = investments.reduce((sum, inv) => sum + toUser(decryptAmount(inv.currentPrice, encKey) * decryptAmount(inv.quantity, encKey), inv.currency), 0);
 
   const investmentByType = investments.reduce(
     (acc, inv) => {
       const type = inv.type;
       if (!acc[type]) acc[type] = 0;
-      acc[type] += toUser(Number(inv.currentPrice) * Number(inv.quantity), inv.currency);
+      acc[type] += toUser(decryptAmount(inv.currentPrice, encKey) * decryptAmount(inv.quantity, encKey), inv.currency);
       return acc;
     },
     {} as Record<string, number>,
@@ -159,8 +161,8 @@ export async function getDashboardData() {
 
   const goalsData = goals.map((g) => {
     const goalCurrency = g.currency || userCurrency;
-    const targetAmount = toUser(Number(g.targetAmount), goalCurrency);
-    const currentAmount = toUser(Number(g.currentAmount), goalCurrency);
+    const targetAmount = toUser(decryptAmount(g.targetAmount, encKey), goalCurrency);
+    const currentAmount = toUser(decryptAmount(g.currentAmount, encKey), goalCurrency);
     return {
       id: g.id,
       name: decrypt(g.name, encKey),
@@ -190,9 +192,9 @@ export async function getDashboardData() {
       include: { account: true },
     });
 
-    const income = monthTransactions.filter((t) => t.type === "INCOME").reduce((sum, t) => sum + toUser(Number(t.amount), t.account.currency), 0);
+    const income = monthTransactions.filter((t) => t.type === "INCOME").reduce((sum, t) => sum + toUser(decryptAmount(t.amount, encKey), t.account.currency), 0);
 
-    const expenses = monthTransactions.filter((t) => t.type === "EXPENSE").reduce((sum, t) => sum + toUser(Number(t.amount), t.account.currency), 0);
+    const expenses = monthTransactions.filter((t) => t.type === "EXPENSE").reduce((sum, t) => sum + toUser(decryptAmount(t.amount, encKey), t.account.currency), 0);
 
     monthlyTrend.push({
       month: monthName,
@@ -207,20 +209,20 @@ export async function getDashboardData() {
     where: { userId },
   });
 
-  const totalDebtAll = allDebts.reduce((sum, d) => sum + toUser(Number(d.remainingAmount), d.currency), 0);
-  const totalDebtPaid = allDebts.reduce((sum, d) => sum + toUser(Number(d.originalAmount) - Number(d.remainingAmount), d.currency), 0);
-  const activeDebts = allDebts.filter((d) => Number(d.remainingAmount) > 0);
+  const totalDebtAll = allDebts.reduce((sum, d) => sum + toUser(decryptAmount(d.remainingAmount, encKey), d.currency), 0);
+  const totalDebtPaid = allDebts.reduce((sum, d) => sum + toUser(decryptAmount(d.originalAmount, encKey) - decryptAmount(d.remainingAmount, encKey), d.currency), 0);
+  const activeDebts = allDebts.filter((d) => decryptAmount(d.remainingAmount, encKey) > 0);
 
   // Installments
   const installments = await db.installment.findMany({
     where: { userId, isCompleted: false },
   });
   const totalInstallmentRemaining = installments.reduce((sum, i) => {
-    const monthlyPayment = Number(i.monthlyPayment);
+    const monthlyPayment = decryptAmount(i.monthlyPayment, encKey);
     const remaining = monthlyPayment * (i.totalMonths - i.paidMonths);
     return sum + toUser(remaining, i.currency);
   }, 0);
-  const totalInstallmentMonthly = installments.reduce((sum, i) => sum + toUser(Number(i.monthlyPayment), i.currency), 0);
+  const totalInstallmentMonthly = installments.reduce((sum, i) => sum + toUser(decryptAmount(i.monthlyPayment, encKey), i.currency), 0);
 
   // Recent transactions
   const recentTransactions = await db.transaction.findMany({
@@ -255,7 +257,7 @@ export async function getDashboardData() {
     recentTransactions: recentTransactions.map((t) => ({
       id: t.id,
       description: decrypt(t.description, encKey),
-      amount: Number(t.amount),
+      amount: decryptAmount(t.amount, encKey),
       type: t.type,
       date: t.date.toISOString(),
       category: t.category?.name || "Uncategorized",
@@ -267,8 +269,8 @@ export async function getDashboardData() {
       id: a.id,
       name: decrypt(a.name, encKey),
       type: a.type,
-      balance: Number(a.balance),
-      reservedAmount: Number(a.reservedAmount),
+      balance: decryptAmount(a.balance, encKey),
+      reservedAmount: decryptAmount(a.reservedAmount, encKey),
       currency: a.currency,
       color: a.color,
     })),
@@ -280,9 +282,10 @@ export async function getDashboardData() {
         id: d.id,
         name: decrypt(d.name, encKey),
         type: d.type,
-        remainingAmount: Number(d.remainingAmount),
-        originalAmount: Number(d.originalAmount),
-        percentage: Number(d.originalAmount) > 0 ? ((Number(d.originalAmount) - Number(d.remainingAmount)) / Number(d.originalAmount)) * 100 : 0,
+        remainingAmount: decryptAmount(d.remainingAmount, encKey),
+        originalAmount: decryptAmount(d.originalAmount, encKey),
+        percentage:
+          decryptAmount(d.originalAmount, encKey) > 0 ? ((decryptAmount(d.originalAmount, encKey) - decryptAmount(d.remainingAmount, encKey)) / decryptAmount(d.originalAmount, encKey)) * 100 : 0,
       })),
     },
     installments: {

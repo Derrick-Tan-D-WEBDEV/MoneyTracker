@@ -4,12 +4,14 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
 import { getViewUser } from "@/lib/partner-view";
+import { getEncryptionKey, decryptAmount } from "@/lib/encryption";
 
 export async function getSpendingInsights() {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
   const { id: userId, currency: userCurrency } = await getViewUser();
+  const encKey = await getEncryptionKey();
   const rates = await getExchangeRates(userCurrency);
   const toUser = (amount: number, from: string) => convertCurrency(amount, from, userCurrency, rates);
 
@@ -39,9 +41,9 @@ export async function getSpendingInsights() {
   });
 
   // Current month total
-  const currentTotal = currentExpenses.reduce((s, t) => s + toUser(Number(t.amount), t.account.currency), 0);
-  const lastTotal = lastExpenses.reduce((s, t) => s + toUser(Number(t.amount), t.account.currency), 0);
-  const twoMonthsTotal = twoMonthsAgoExpenses.reduce((s, t) => s + toUser(Number(t.amount), t.account.currency), 0);
+  const currentTotal = currentExpenses.reduce((s, t) => s + toUser(decryptAmount(t.amount, encKey), t.account.currency), 0);
+  const lastTotal = lastExpenses.reduce((s, t) => s + toUser(decryptAmount(t.amount, encKey), t.account.currency), 0);
+  const twoMonthsTotal = twoMonthsAgoExpenses.reduce((s, t) => s + toUser(decryptAmount(t.amount, encKey), t.account.currency), 0);
 
   // Daily spending rate
   const dayOfMonth = now.getDate();
@@ -54,14 +56,14 @@ export async function getSpendingInsights() {
   for (const t of currentExpenses) {
     const key = t.category?.name || "Uncategorized";
     const existing = currentByCat.get(key) || { amount: 0, name: key, color: t.category?.color || "#6B7280" };
-    existing.amount += toUser(Number(t.amount), t.account.currency);
+    existing.amount += toUser(decryptAmount(t.amount, encKey), t.account.currency);
     currentByCat.set(key, existing);
   }
 
   const lastByCat = new Map<string, number>();
   for (const t of lastExpenses) {
     const key = t.category?.name || "Uncategorized";
-    lastByCat.set(key, (lastByCat.get(key) || 0) + toUser(Number(t.amount), t.account.currency));
+    lastByCat.set(key, (lastByCat.get(key) || 0) + toUser(decryptAmount(t.amount, encKey), t.account.currency));
   }
 
   // Categories that increased most

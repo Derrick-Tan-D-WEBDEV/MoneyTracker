@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
 import { getViewUserId } from "@/lib/partner-view";
-import { getEncryptionKey, decrypt } from "@/lib/encryption";
+import { getEncryptionKey, decrypt, decryptAmount } from "@/lib/encryption";
 
 export interface CalendarEvent {
   id: string;
@@ -39,7 +39,7 @@ export async function getBillCalendarData(month?: number, year?: number) {
       events.push({
         id: `debt-${debt.id}`,
         name: decrypt(debt.name, encKey),
-        amount: Number(debt.minimumPayment),
+        amount: decryptAmount(debt.minimumPayment, encKey),
         currency: debt.currency,
         date: new Date(targetYear, targetMonth, day).toISOString(),
         type: "debt",
@@ -59,7 +59,7 @@ export async function getBillCalendarData(month?: number, year?: number) {
     events.push({
       id: `inst-${inst.id}`,
       name: decrypt(inst.name, encKey),
-      amount: Number(inst.monthlyPayment),
+      amount: decryptAmount(inst.monthlyPayment, encKey),
       currency: inst.currency,
       date: new Date(targetYear, targetMonth, day).toISOString(),
       type: "installment",
@@ -81,7 +81,7 @@ export async function getBillCalendarData(month?: number, year?: number) {
       events.push({
         id: `rec-${rule.id}`,
         name: decrypt(tx.description, encKey),
-        amount: Number(tx.amount),
+        amount: decryptAmount(tx.amount, encKey),
         currency: tx.account.currency,
         date: nextDue.toISOString(),
         type: "recurring",
@@ -102,7 +102,7 @@ export async function getBillCalendarData(month?: number, year?: number) {
       events.push({
         id: `sub-${sub.id}`,
         name: decrypt(sub.name, encKey),
-        amount: Number(sub.amount),
+        amount: decryptAmount(sub.amount, encKey),
         currency: sub.currency,
         date: new Date(targetYear, targetMonth, day).toISOString(),
         type: "subscription",

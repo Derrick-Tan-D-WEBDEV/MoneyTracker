@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getViewUserId } from "@/lib/partner-view";
-import { getEncryptionKey, encrypt, decrypt } from "@/lib/encryption";
+import { getEncryptionKey, encrypt, decrypt, encryptAmount, decryptAmount } from "@/lib/encryption";
 
 const goalSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -39,10 +39,10 @@ export async function getGoals() {
   });
 
   return goals.map((g) => {
-    const currentAmount = Number(g.currentAmount);
-    const targetAmount = Number(g.targetAmount);
-    const interestRate = Number(g.interestRate);
-    const monthlyContribution = Number(g.monthlyContribution);
+    const currentAmount = decryptAmount(g.currentAmount, encKey);
+    const targetAmount = decryptAmount(g.targetAmount, encKey);
+    const interestRate = decryptAmount(g.interestRate, encKey);
+    const monthlyContribution = decryptAmount(g.monthlyContribution, encKey);
     const remaining = Math.max(targetAmount - currentAmount, 0);
     const percentage = targetAmount > 0 ? (currentAmount / targetAmount) * 100 : 0;
 
@@ -104,6 +104,10 @@ export async function createGoal(data: z.input<typeof goalSchema>) {
     data: {
       ...rest,
       name: encrypt(rest.name, encKey),
+      targetAmount: encryptAmount(rest.targetAmount, encKey),
+      currentAmount: encryptAmount(rest.currentAmount, encKey),
+      interestRate: encryptAmount(rest.interestRate, encKey),
+      monthlyContribution: encryptAmount(rest.monthlyContribution, encKey),
       accountId: accountId || null,
       userId: session.user.id,
     },
@@ -141,7 +145,15 @@ export async function updateGoal(id: string, data: z.input<typeof goalSchema>) {
 
   await db.goal.update({
     where: { id },
-    data: { ...rest, name: encrypt(rest.name, encKey), accountId: accountId || null },
+    data: {
+      ...rest,
+      name: encrypt(rest.name, encKey),
+      targetAmount: encryptAmount(rest.targetAmount, encKey),
+      currentAmount: encryptAmount(rest.currentAmount, encKey),
+      interestRate: encryptAmount(rest.interestRate, encKey),
+      monthlyContribution: encryptAmount(rest.monthlyContribution, encKey),
+      accountId: accountId || null,
+    },
   });
 
   revalidatePath("/");
@@ -151,6 +163,7 @@ export async function updateGoal(id: string, data: z.input<typeof goalSchema>) {
 export async function addContribution(id: string, amount: number) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   if (amount <= 0) throw new Error("Amount must be positive");
 
@@ -159,9 +172,10 @@ export async function addContribution(id: string, amount: number) {
   });
   if (!goal) throw new Error("Goal not found");
 
+  const newAmount = decryptAmount(goal.currentAmount, encKey) + amount;
   const updated = await db.goal.update({
     where: { id },
-    data: { currentAmount: { increment: amount } },
+    data: { currentAmount: encryptAmount(newAmount, encKey) },
   });
 
   const { checkAchievements } = await import("@/actions/gamification");
@@ -170,7 +184,7 @@ export async function addContribution(id: string, amount: number) {
   await checkAchievements("goal_contribution");
 
   // Check if goal is now complete
-  if (Number(updated.currentAmount) >= Number(updated.targetAmount)) {
+  if (decryptAmount(updated.currentAmount, encKey) >= decryptAmount(updated.targetAmount, encKey)) {
     await checkAchievements("goal_complete");
   }
 

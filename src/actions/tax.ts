@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { calculateSGTax, type TaxInput, type TaxResult } from "@/lib/sg-tax";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
+import { getEncryptionKey, decryptAmount } from "@/lib/encryption";
 
 export interface TaxPredictionData {
   incomeYTD: number;
@@ -18,6 +19,7 @@ export async function getTaxPredictionData(): Promise<TaxPredictionData> {
   if (!session?.user?.id) throw new Error("Unauthorized");
 
   const userCurrency = session.user.currency || "SGD";
+  const encKey = await getEncryptionKey();
   const rates = await getExchangeRates(userCurrency);
 
   const now = new Date();
@@ -34,13 +36,13 @@ export async function getTaxPredictionData(): Promise<TaxPredictionData> {
   });
 
   // Sum income in user's currency
-  const incomeYTD = incomeTransactions.reduce((sum, t) => sum + convertCurrency(Number(t.amount), t.account.currency, userCurrency, rates), 0);
+  const incomeYTD = incomeTransactions.reduce((sum, t) => sum + convertCurrency(decryptAmount(t.amount, encKey), t.account.currency, userCurrency, rates), 0);
 
   // Group by category
   const byCat: Record<string, number> = {};
   for (const t of incomeTransactions) {
     const catName = t.category?.name || "Uncategorized";
-    const converted = convertCurrency(Number(t.amount), t.account.currency, userCurrency, rates);
+    const converted = convertCurrency(decryptAmount(t.amount, encKey), t.account.currency, userCurrency, rates);
     byCat[catName] = (byCat[catName] || 0) + converted;
   }
   const incomeSources = Object.entries(byCat)

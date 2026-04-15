@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getEncryptionKey, encrypt, decrypt } from "@/lib/encryption";
+import { getEncryptionKey, encrypt, decrypt, encryptAmount, decryptAmount } from "@/lib/encryption";
 
 function getNextDueDate(current: Date, frequency: string): Date {
   const next = new Date(current);
@@ -56,7 +56,7 @@ export async function createRecurringRule(data: z.input<typeof recurringSchema>)
       accountId: parsed.accountId,
       categoryId: parsed.categoryId || null,
       type: parsed.type,
-      amount: parsed.amount,
+      amount: encryptAmount(parsed.amount, encKey),
       description: encrypt(parsed.description, encKey),
       date: parsed.nextDue,
       notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
@@ -81,6 +81,7 @@ export async function createRecurringRule(data: z.input<typeof recurringSchema>)
 export async function processRecurringTransactions() {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const now = new Date();
 
@@ -115,10 +116,13 @@ export async function processRecurringTransactions() {
     });
 
     // Update account balance
-    const balanceChange = t.type === "INCOME" ? Number(t.amount) : -Number(t.amount);
+    const txAmount = decryptAmount(t.amount, encKey);
+    const balanceChange = t.type === "INCOME" ? txAmount : -txAmount;
+    const acct = await db.financialAccount.findUnique({ where: { id: t.accountId } });
+    const currentBalance = decryptAmount(acct!.balance, encKey);
     await db.financialAccount.update({
       where: { id: t.accountId },
-      data: { balance: { increment: balanceChange } },
+      data: { balance: encryptAmount(currentBalance + balanceChange, encKey) },
     });
 
     // Advance the next due date
@@ -164,7 +168,7 @@ export async function getRecurringRules() {
     transaction: {
       id: r.transaction.id,
       description: decrypt(r.transaction.description, encKey),
-      amount: Number(r.transaction.amount),
+      amount: decryptAmount(r.transaction.amount, encKey),
       type: r.transaction.type,
       notes: r.transaction.notes ? decrypt(r.transaction.notes, encKey) : r.transaction.notes,
       category: r.transaction.category ? { id: r.transaction.category.id, name: r.transaction.category.name, color: r.transaction.category.color, icon: r.transaction.category.icon } : null,
@@ -218,7 +222,7 @@ export async function updateRecurringRule(id: string, data: z.input<typeof recur
       accountId: parsed.accountId,
       categoryId: parsed.categoryId || null,
       type: parsed.type,
-      amount: parsed.amount,
+      amount: encryptAmount(parsed.amount, encKey),
       description: encrypt(parsed.description, encKey),
       notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
     },

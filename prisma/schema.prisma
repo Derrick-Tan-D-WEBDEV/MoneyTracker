@@ -23,6 +23,7 @@ model User {
   streak          Int       @default(0)
   lastActiveDate  DateTime?
   encryptionSalt  String?   // Per-user PBKDF2 salt for field-level encryption
+  storedEncKey    String?   // Encryption key encrypted with server master key (for partner view)
   isDataEncrypted Boolean   @default(false) // Whether existing data has been encrypted
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -144,13 +145,13 @@ model FinancialAccount {
   userId       String      @db.Uuid
   name         String
   type         AccountType
-  balance        Decimal     @default(0) @db.Decimal(19, 4)
-  reservedAmount Decimal     @default(0) @db.Decimal(19, 4) // Money parked that isn't the user's
+  balance        String      @default("0")
+  reservedAmount String      @default("0") // Money parked that isn't the user's
   currency       String      @default("USD")
   color          String      @default("#3B82F6")
   icon         String      @default("wallet")
   isArchived   Boolean     @default(false)
-  creditLimit  Decimal?    @db.Decimal(19, 4) // For CREDIT_CARD accounts
+  creditLimit  String? // For CREDIT_CARD accounts
   repaymentDay Int?        // Day of month repayment is due (1-31)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
@@ -189,7 +190,7 @@ model Transaction {
   accountId   String          @db.Uuid
   categoryId  String?         @db.Uuid
   type        TransactionType
-  amount      Decimal         @db.Decimal(19, 4)
+  amount      String
   description String
   date        DateTime
   notes        String?
@@ -216,7 +217,7 @@ model Budget {
   id         String       @id @default(uuid()) @db.Uuid
   userId     String       @db.Uuid
   categoryId String       @db.Uuid
-  amount     Decimal      @db.Decimal(19, 4)
+  amount     String
   currency       String       @default("MYR")
   period         BudgetPeriod @default(MONTHLY)
   alertThreshold Int          @default(80)
@@ -239,9 +240,9 @@ model Investment {
   symbol       String?
   name         String
   type         InvestmentType
-  quantity     Decimal        @db.Decimal(19, 8)
-  buyPrice     Decimal        @db.Decimal(19, 4)
-  currentPrice Decimal        @db.Decimal(19, 4)
+  quantity     String
+  buyPrice     String
+  currentPrice String
   currency     String         @default("USD")
   buyDate      DateTime
   notes        String?
@@ -259,13 +260,13 @@ model Goal {
   userId              String   @db.Uuid
   accountId           String?  @db.Uuid
   name                String
-  targetAmount        Decimal  @db.Decimal(19, 4)
-  currentAmount       Decimal  @default(0) @db.Decimal(19, 4)
+  targetAmount        String
+  currentAmount       String  @default("0")
   currency            String   @default("MYR")
   type                GoalType @default(CUSTOM)
   deadline            DateTime?
-  interestRate        Decimal  @default(0) @db.Decimal(5, 2) // Annual interest rate for savings projection
-  monthlyContribution Decimal  @default(0) @db.Decimal(19, 4) // Planned monthly savings
+  interestRate        String  @default("0") // Annual interest rate for savings projection
+  monthlyContribution String  @default("0") // Planned monthly savings
   icon                String   @default("target")
   color               String   @default("#10B981")
   createdAt           DateTime @default(now())
@@ -308,10 +309,10 @@ model Debt {
   name            String
   type            DebtType @default(OTHER)
   lender          String?
-  originalAmount  Decimal  @db.Decimal(19, 4)
-  remainingAmount Decimal  @db.Decimal(19, 4)
-  interestRate    Decimal  @default(0) @db.Decimal(5, 2) // e.g. 5.50%
-  minimumPayment  Decimal  @default(0) @db.Decimal(19, 4)
+  originalAmount  String
+  remainingAmount String
+  interestRate    String  @default("0") // e.g. 5.50%
+  minimumPayment  String  @default("0")
   dueDay          Int?     // Day of month payment is due (1-31)
   startDate       DateTime
   endDate         DateTime? // Expected payoff date
@@ -344,11 +345,11 @@ model Installment {
   name            String
   type            InstallmentType @default(PURCHASE)
   merchant        String?
-  totalAmount     Decimal         @db.Decimal(19, 4)
-  monthlyPayment  Decimal         @db.Decimal(19, 4)
+  totalAmount     String
+  monthlyPayment  String
   totalMonths     Int
   paidMonths      Int             @default(0)
-  interestRate    Decimal         @default(0) @db.Decimal(5, 2)
+  interestRate    String  @default("0")
   startDate       DateTime
   currency        String          @default("USD")
   isCompleted     Boolean         @default(false)
@@ -397,7 +398,7 @@ model NetWorthSnapshot {
   id       String   @id @default(uuid()) @db.Uuid
   userId   String   @db.Uuid
   date     DateTime @db.Date
-  netWorth Decimal  @db.Decimal(19, 4)
+  netWorth String
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -412,7 +413,7 @@ model Subscription {
   id              String              @id @default(uuid()) @db.Uuid
   userId          String              @db.Uuid
   name            String
-  amount          Decimal             @db.Decimal(19, 4)
+  amount          String
   currency        String              @default("USD")
   frequency       RecurrenceFrequency @default(MONTHLY)
   nextBillingDate DateTime
@@ -437,7 +438,7 @@ model WishlistItem {
   id            String    @id @default(uuid()) @db.Uuid
   userId        String    @db.Uuid
   name          String
-  estimatedCost Decimal   @db.Decimal(19, 4)
+  estimatedCost String
   currency      String    @default("USD")
   priority      Int       @default(3)
   targetDate    DateTime?
@@ -466,8 +467,8 @@ model Asset {
   userId           String    @db.Uuid
   name             String
   type             AssetType @default(OTHER)
-  purchasePrice    Decimal   @db.Decimal(19, 4)
-  currentValue     Decimal   @db.Decimal(19, 4)
+  purchasePrice    String
+  currentValue     String
   currency         String    @default("USD")
   purchaseDate     DateTime?
   lastValuedDate   DateTime?

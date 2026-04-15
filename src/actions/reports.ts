@@ -4,9 +4,11 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
 import { getViewUser } from "@/lib/partner-view";
+import { getEncryptionKey, decryptAmount } from "@/lib/encryption";
 
 export async function getReportData(year?: number) {
   const { id: userId, currency: userCurrency } = await getViewUser();
+  const encKey = await getEncryptionKey();
 
   const rates = await getExchangeRates(userCurrency);
   const toUser = (amount: number, from: string) => convertCurrency(amount, from, userCurrency, rates);
@@ -37,7 +39,7 @@ export async function getReportData(year?: number) {
 
   for (const t of transactions) {
     const month = t.date.getMonth();
-    const amount = toUser(Number(t.amount), t.account.currency);
+    const amount = toUser(decryptAmount(t.amount, encKey), t.account.currency);
     if (t.type === "INCOME") {
       monthlyData[month].income += amount;
     } else if (t.type === "EXPENSE") {
@@ -55,7 +57,7 @@ export async function getReportData(year?: number) {
     const catName = t.category?.name || "Uncategorized";
     const catColor = t.category?.color || "#6B7280";
     const existing = categoryMap.get(catName) || { name: catName, color: catColor, income: 0, expenses: 0 };
-    const amount = toUser(Number(t.amount), t.account.currency);
+    const amount = toUser(decryptAmount(t.amount, encKey), t.account.currency);
     if (t.type === "INCOME") existing.income += amount;
     else if (t.type === "EXPENSE") existing.expenses += amount;
     categoryMap.set(catName, existing);
@@ -87,7 +89,7 @@ export async function getReportData(year?: number) {
   for (const t of transactions) {
     if (t.type === "EXPENSE") {
       const key = t.date.toISOString().split("T")[0];
-      dailyMap.set(key, (dailyMap.get(key) || 0) + toUser(Number(t.amount), t.account.currency));
+      dailyMap.set(key, (dailyMap.get(key) || 0) + toUser(decryptAmount(t.amount, encKey), t.account.currency));
     }
   }
   for (const [date, amount] of dailyMap) {

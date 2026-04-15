@@ -4,7 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
-import { generateSalt, deriveKey, encryptExistingData } from "@/lib/encryption";
+import { generateSalt, deriveKey, encryptExistingData, storeEncryptionKey } from "@/lib/encryption";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
@@ -56,6 +56,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         const encryptionKey = deriveKey(credentials.password as string, salt);
+
+        // Store encrypted key in DB for partner view (couple feature)
+        storeEncryptionKey(user.id, encryptionKey).catch(() => {});
 
         // Lazy-encrypt existing plaintext data on first login
         if (!user.isDataEncrypted) {

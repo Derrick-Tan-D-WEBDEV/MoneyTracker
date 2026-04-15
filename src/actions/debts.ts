@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getViewUserId } from "@/lib/partner-view";
-import { getEncryptionKey, encrypt, decrypt } from "@/lib/encryption";
+import { getEncryptionKey, encrypt, decrypt, encryptAmount, decryptAmount } from "@/lib/encryption";
 
 const debtSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -40,7 +40,7 @@ export async function getDebts() {
 
   const debts = await db.debt.findMany({
     where: { userId },
-    orderBy: [{ isPaidOff: "asc" }, { remainingAmount: "desc" }],
+    orderBy: [{ isPaidOff: "asc" }, { createdAt: "desc" }],
     include: { account: { select: { id: true, name: true, type: true, color: true, creditLimit: true, repaymentDay: true } } },
   });
 
@@ -53,11 +53,11 @@ export async function getDebts() {
     accountName: d.account ? decrypt(d.account.name, encKey) : null,
     accountColor: d.account?.color || null,
     accountRepaymentDay: d.account?.repaymentDay || null,
-    accountCreditLimit: d.account?.creditLimit ? Number(d.account.creditLimit) : null,
-    originalAmount: Number(d.originalAmount),
-    remainingAmount: Number(d.remainingAmount),
-    interestRate: Number(d.interestRate),
-    minimumPayment: Number(d.minimumPayment),
+    accountCreditLimit: d.account?.creditLimit ? decryptAmount(d.account.creditLimit, encKey) : null,
+    originalAmount: decryptAmount(d.originalAmount, encKey),
+    remainingAmount: decryptAmount(d.remainingAmount, encKey),
+    interestRate: decryptAmount(d.interestRate, encKey),
+    minimumPayment: decryptAmount(d.minimumPayment, encKey),
     dueDay: d.dueDay,
     startDate: d.startDate.toISOString(),
     endDate: d.endDate?.toISOString() || null,
@@ -83,6 +83,10 @@ export async function createDebt(data: z.input<typeof debtSchema>) {
       name: encrypt(parsed.name, encKey),
       lender: parsed.lender ? encrypt(parsed.lender, encKey) : parsed.lender,
       notes: parsed.notes ? encrypt(parsed.notes, encKey) : parsed.notes,
+      originalAmount: encryptAmount(parsed.originalAmount, encKey),
+      remainingAmount: encryptAmount(parsed.remainingAmount, encKey),
+      interestRate: encryptAmount(parsed.interestRate, encKey),
+      minimumPayment: encryptAmount(parsed.minimumPayment, encKey),
       userId: session.user.id,
     },
   });
@@ -115,6 +119,10 @@ export async function updateDebt(id: string, data: z.input<typeof debtSchema>) {
       name: encrypt(parsed.name, encKey),
       lender: parsed.lender ? encrypt(parsed.lender, encKey) : parsed.lender,
       notes: parsed.notes ? encrypt(parsed.notes, encKey) : parsed.notes,
+      originalAmount: encryptAmount(parsed.originalAmount, encKey),
+      remainingAmount: encryptAmount(parsed.remainingAmount, encKey),
+      interestRate: encryptAmount(parsed.interestRate, encKey),
+      minimumPayment: encryptAmount(parsed.minimumPayment, encKey),
     },
   });
 
@@ -126,6 +134,7 @@ export async function updateDebt(id: string, data: z.input<typeof debtSchema>) {
 export async function makePayment(data: z.input<typeof paymentSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const parsed = paymentSchema.parse(data);
 
@@ -134,7 +143,7 @@ export async function makePayment(data: z.input<typeof paymentSchema>) {
   });
   if (!debt) throw new Error("Debt not found");
 
-  const currentRemaining = Number(debt.remainingAmount);
+  const currentRemaining = decryptAmount(debt.remainingAmount, encKey);
   const paymentAmount = Math.min(parsed.amount, currentRemaining);
   const newRemaining = currentRemaining - paymentAmount;
   const isPaidOff = newRemaining <= 0;
@@ -142,7 +151,7 @@ export async function makePayment(data: z.input<typeof paymentSchema>) {
   await db.debt.update({
     where: { id: parsed.debtId },
     data: {
-      remainingAmount: Math.max(newRemaining, 0),
+      remainingAmount: encryptAmount(Math.max(newRemaining, 0), encKey),
       isPaidOff,
     },
   });

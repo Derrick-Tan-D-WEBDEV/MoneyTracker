@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
 import { getViewUser } from "@/lib/partner-view";
-import { getEncryptionKey, decrypt } from "@/lib/encryption";
+import { getEncryptionKey, decrypt, decryptAmount } from "@/lib/encryption";
 
 export async function getExportData(options: { startDate?: string; endDate?: string; type?: string }) {
   const session = await auth();
@@ -50,21 +50,21 @@ export async function getExportData(options: { startDate?: string; endDate?: str
       category: t.category?.name || "",
       account: decrypt(t.account.name, encKey),
       accountCurrency: t.account.currency,
-      amount: Number(t.amount),
-      amountInUserCurrency: convertCurrency(Number(t.amount), t.account.currency, userCurrency, rates),
+      amount: decryptAmount(t.amount, encKey),
+      amountInUserCurrency: convertCurrency(decryptAmount(t.amount, encKey), t.account.currency, userCurrency, rates),
       tags: t.tags.map((tag) => decrypt(tag.name, encKey)).join(", "),
       notes: t.notes ? decrypt(t.notes, encKey) : "",
     })),
     accounts: accounts.map((a) => ({
       name: decrypt(a.name, encKey),
       type: a.type,
-      balance: Number(a.balance),
-      reservedAmount: Number(a.reservedAmount),
+      balance: decryptAmount(a.balance, encKey),
+      reservedAmount: decryptAmount(a.reservedAmount, encKey),
       currency: a.currency,
     })),
     budgets: budgets.map((b) => ({
       category: b.category.name,
-      limit: Number(b.amount),
+      limit: decryptAmount(b.amount, encKey),
       period: b.period,
     })),
     userCurrency,

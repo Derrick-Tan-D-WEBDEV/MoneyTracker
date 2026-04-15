@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getViewUserId } from "@/lib/partner-view";
-import { getEncryptionKey, encrypt, decrypt } from "@/lib/encryption";
+import { getEncryptionKey, encrypt, decrypt, encryptAmount, decryptAmount } from "@/lib/encryption";
 
 const wishlistSchema = z.object({
   name: z.string().min(1),
@@ -29,7 +29,7 @@ export async function getWishlistItems() {
   return items.map((item) => ({
     id: item.id,
     name: decrypt(item.name, encKey),
-    estimatedCost: Number(item.estimatedCost),
+    estimatedCost: decryptAmount(item.estimatedCost, encKey),
     currency: item.currency,
     priority: item.priority,
     targetDate: item.targetDate?.toISOString() ?? null,
@@ -51,7 +51,7 @@ export async function createWishlistItem(data: z.input<typeof wishlistSchema>) {
     data: {
       userId: session.user.id,
       name: encrypt(parsed.name, encKey),
-      estimatedCost: parsed.estimatedCost,
+      estimatedCost: encryptAmount(parsed.estimatedCost, encKey),
       currency: parsed.currency,
       priority: parsed.priority,
       targetDate: parsed.targetDate ? new Date(parsed.targetDate) : null,
@@ -96,7 +96,7 @@ export async function updateWishlistItem(id: string, data: z.input<typeof wishli
     where: { id },
     data: {
       name: encrypt(parsed.name, encKey),
-      estimatedCost: parsed.estimatedCost,
+      estimatedCost: encryptAmount(parsed.estimatedCost, encKey),
       currency: parsed.currency,
       priority: parsed.priority,
       targetDate: parsed.targetDate ? new Date(parsed.targetDate) : null,

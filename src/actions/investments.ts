@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getViewUserId } from "@/lib/partner-view";
-import { getEncryptionKey, encrypt, decrypt } from "@/lib/encryption";
+import { getEncryptionKey, encrypt, decrypt, encryptAmount, decryptAmount } from "@/lib/encryption";
 
 const investmentSchema = z.object({
   accountId: z.string().uuid().optional().nullable(),
@@ -35,13 +35,13 @@ export async function getInvestments() {
     symbol: inv.symbol ? decrypt(inv.symbol, encKey) : inv.symbol,
     name: decrypt(inv.name, encKey),
     type: inv.type,
-    quantity: Number(inv.quantity),
-    buyPrice: Number(inv.buyPrice),
-    currentPrice: Number(inv.currentPrice),
-    totalValue: Number(inv.currentPrice) * Number(inv.quantity),
-    totalCost: Number(inv.buyPrice) * Number(inv.quantity),
-    pnl: (Number(inv.currentPrice) - Number(inv.buyPrice)) * Number(inv.quantity),
-    pnlPercentage: Number(inv.buyPrice) > 0 ? ((Number(inv.currentPrice) - Number(inv.buyPrice)) / Number(inv.buyPrice)) * 100 : 0,
+    quantity: decryptAmount(inv.quantity, encKey),
+    buyPrice: decryptAmount(inv.buyPrice, encKey),
+    currentPrice: decryptAmount(inv.currentPrice, encKey),
+    totalValue: decryptAmount(inv.currentPrice, encKey) * decryptAmount(inv.quantity, encKey),
+    totalCost: decryptAmount(inv.buyPrice, encKey) * decryptAmount(inv.quantity, encKey),
+    pnl: (decryptAmount(inv.currentPrice, encKey) - decryptAmount(inv.buyPrice, encKey)) * decryptAmount(inv.quantity, encKey),
+    pnlPercentage: decryptAmount(inv.buyPrice, encKey) > 0 ? ((decryptAmount(inv.currentPrice, encKey) - decryptAmount(inv.buyPrice, encKey)) / decryptAmount(inv.buyPrice, encKey)) * 100 : 0,
     currency: inv.currency,
     buyDate: inv.buyDate.toISOString(),
     notes: inv.notes ? decrypt(inv.notes, encKey) : inv.notes,
@@ -64,6 +64,9 @@ export async function createInvestment(data: z.input<typeof investmentSchema>) {
       symbol: parsed.symbol ? encrypt(parsed.symbol, encKey) : null,
       name: encrypt(parsed.name, encKey),
       notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
+      quantity: encryptAmount(parsed.quantity, encKey),
+      buyPrice: encryptAmount(parsed.buyPrice, encKey),
+      currentPrice: encryptAmount(parsed.currentPrice, encKey),
     },
   });
 
@@ -97,6 +100,9 @@ export async function updateInvestment(id: string, data: z.input<typeof investme
       symbol: parsed.symbol ? encrypt(parsed.symbol, encKey) : null,
       name: encrypt(parsed.name, encKey),
       notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
+      quantity: encryptAmount(parsed.quantity, encKey),
+      buyPrice: encryptAmount(parsed.buyPrice, encKey),
+      currentPrice: encryptAmount(parsed.currentPrice, encKey),
     },
   });
 

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { ACHIEVEMENTS, getAchievement, calculateLevel, calculateTransactionXp, XP_INVESTMENT, XP_GOAL_CONTRIBUTION } from "@/lib/achievements";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
 import { getViewUserId } from "@/lib/partner-view";
+import { getEncryptionKey, decryptAmount } from "@/lib/encryption";
 
 export async function getUserStats() {
   const userId = await getViewUserId();
@@ -212,7 +213,8 @@ export async function checkAchievements(
 
       // Check how many goals completed
       const completedGoals = await db.goal.findMany({ where: { userId } });
-      const doneCount = completedGoals.filter((g) => Number(g.currentAmount) >= Number(g.targetAmount)).length;
+      const encKeyGoal = await getEncryptionKey();
+      const doneCount = completedGoals.filter((g) => decryptAmount(g.currentAmount, encKeyGoal) >= decryptAmount(g.targetAmount, encKeyGoal)).length;
       if (doneCount >= 5) newAchievements.push(...(await tryUnlock(userId, "FIVE_GOALS_COMPLETE")));
       break;
     }
@@ -222,7 +224,8 @@ export async function checkAchievements(
 
       // Check 50% milestone
       const goals = await db.goal.findMany({ where: { userId } });
-      const has50 = goals.some((g) => Number(g.targetAmount) > 0 && Number(g.currentAmount) / Number(g.targetAmount) >= 0.5);
+      const encKeyGoalC = await getEncryptionKey();
+      const has50 = goals.some((g) => decryptAmount(g.targetAmount, encKeyGoalC) > 0 && decryptAmount(g.currentAmount, encKeyGoalC) / decryptAmount(g.targetAmount, encKeyGoalC) >= 0.5);
       if (has50) newAchievements.push(...(await tryUnlock(userId, "GOAL_50_PERCENT")));
       break;
     }
@@ -272,12 +275,13 @@ async function checkBalanceAchievements(userId: string, results: string[]) {
     select: { balance: true, reservedAmount: true, currency: true, type: true, creditLimit: true },
   });
   // Convert all balances to USD for consistent achievement thresholds
+  const encKeyBal = await getEncryptionKey();
   const totalBalanceUSD = accounts.reduce((sum, a) => {
-    const effectiveBalance = Number(a.balance) - Number(a.reservedAmount);
+    const effectiveBalance = decryptAmount(a.balance, encKeyBal) - decryptAmount(a.reservedAmount, encKeyBal);
     const converted = convertCurrency(effectiveBalance, a.currency, "USD", rates);
     if (a.type === "CREDIT_CARD") {
       // Balance = available credit; liability = creditLimit - balance
-      const limit = a.creditLimit ? convertCurrency(Number(a.creditLimit), a.currency, "USD", rates) : 0;
+      const limit = a.creditLimit ? convertCurrency(decryptAmount(a.creditLimit, encKeyBal), a.currency, "USD", rates) : 0;
       return sum - (limit - converted);
     }
     return sum + converted;

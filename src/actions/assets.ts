@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getViewUserId } from "@/lib/partner-view";
-import { getEncryptionKey, encrypt, decrypt } from "@/lib/encryption";
+import { getEncryptionKey, encrypt, decrypt, encryptAmount, decryptAmount } from "@/lib/encryption";
 
 const assetSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -36,15 +36,15 @@ export async function getAssets() {
 
   const assets = await db.asset.findMany({
     where: { userId },
-    orderBy: [{ isSold: "asc" }, { currentValue: "desc" }],
+    orderBy: [{ isSold: "asc" }, { createdAt: "desc" }],
   });
 
   return assets.map((a) => ({
     id: a.id,
     name: decrypt(a.name, encKey),
     type: a.type,
-    purchasePrice: Number(a.purchasePrice),
-    currentValue: Number(a.currentValue),
+    purchasePrice: decryptAmount(a.purchasePrice, encKey),
+    currentValue: decryptAmount(a.currentValue, encKey),
     currency: a.currency,
     purchaseDate: a.purchaseDate?.toISOString() || null,
     lastValuedDate: a.lastValuedDate?.toISOString() || null,
@@ -56,8 +56,9 @@ export async function getAssets() {
     notes: a.notes ? decrypt(a.notes, encKey) : a.notes,
     createdAt: a.createdAt.toISOString(),
     // Computed
-    gainLoss: Number(a.currentValue) - Number(a.purchasePrice),
-    gainLossPercentage: Number(a.purchasePrice) > 0 ? ((Number(a.currentValue) - Number(a.purchasePrice)) / Number(a.purchasePrice)) * 100 : 0,
+    gainLoss: decryptAmount(a.currentValue, encKey) - decryptAmount(a.purchasePrice, encKey),
+    gainLossPercentage:
+      decryptAmount(a.purchasePrice, encKey) > 0 ? ((decryptAmount(a.currentValue, encKey) - decryptAmount(a.purchasePrice, encKey)) / decryptAmount(a.purchasePrice, encKey)) * 100 : 0,
   }));
 }
 
@@ -75,6 +76,8 @@ export async function createAsset(data: z.input<typeof assetSchema>) {
       location: parsed.location ? encrypt(parsed.location, encKey) : parsed.location,
       description: parsed.description ? encrypt(parsed.description, encKey) : parsed.description,
       notes: parsed.notes ? encrypt(parsed.notes, encKey) : parsed.notes,
+      purchasePrice: encryptAmount(parsed.purchasePrice, encKey),
+      currentValue: encryptAmount(parsed.currentValue, encKey),
       userId: session.user.id,
     },
   });
@@ -104,6 +107,8 @@ export async function updateAsset(id: string, data: z.input<typeof assetSchema>)
       location: parsed.location ? encrypt(parsed.location, encKey) : parsed.location,
       description: parsed.description ? encrypt(parsed.description, encKey) : parsed.description,
       notes: parsed.notes ? encrypt(parsed.notes, encKey) : parsed.notes,
+      purchasePrice: encryptAmount(parsed.purchasePrice, encKey),
+      currentValue: encryptAmount(parsed.currentValue, encKey),
     },
   });
 
@@ -114,6 +119,7 @@ export async function updateAsset(id: string, data: z.input<typeof assetSchema>)
 export async function updateAssetValue(id: string, currentValue: number) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const existing = await db.asset.findFirst({
     where: { id, userId: session.user.id },
@@ -122,7 +128,7 @@ export async function updateAssetValue(id: string, currentValue: number) {
 
   await db.asset.update({
     where: { id },
-    data: { currentValue, lastValuedDate: new Date() },
+    data: { currentValue: encryptAmount(currentValue, encKey), lastValuedDate: new Date() },
   });
 
   revalidatePath("/");
