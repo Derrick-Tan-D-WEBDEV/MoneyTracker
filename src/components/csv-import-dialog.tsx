@@ -486,12 +486,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[40px]">
-                          <input
-                            type="checkbox"
-                            checked={allSelected}
-                            onChange={toggleAll}
-                            className="rounded border-muted-foreground"
-                          />
+                          <input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded border-muted-foreground" />
                         </TableHead>
                         <TableHead className="w-[90px]">Date</TableHead>
                         <TableHead>Description</TableHead>
@@ -503,20 +498,11 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                       {reviewRows.map((row) => (
                         <TableRow key={row.id} className={!row.selected ? "opacity-40" : ""}>
                           <TableCell>
-                            <input
-                              type="checkbox"
-                              checked={row.selected}
-                              onChange={() => toggleRow(row.id)}
-                              className="rounded border-muted-foreground"
-                            />
+                            <input type="checkbox" checked={row.selected} onChange={() => toggleRow(row.id)} className="rounded border-muted-foreground" />
                           </TableCell>
                           <TableCell className="text-sm">{row.date}</TableCell>
                           <TableCell>
-                            <Input
-                              value={row.description}
-                              onChange={(e) => updateRow(row.id, "description", e.target.value)}
-                              className="h-7 text-sm"
-                            />
+                            <Input value={row.description} onChange={(e) => updateRow(row.id, "description", e.target.value)} className="h-7 text-sm" />
                           </TableCell>
                           <TableCell>
                             <Badge
@@ -544,7 +530,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                 </div>
 
                 <div className="flex justify-between">
-                  <Button variant="outline" onClick={() => fileType === "csv" ? setStep("mapping") : reset()}>
+                  <Button variant="outline" onClick={() => (fileType === "csv" ? setStep("mapping") : reset())}>
                     Back
                   </Button>
                   <Button onClick={handleImport} disabled={importing || selected.length === 0 || !accountId}>

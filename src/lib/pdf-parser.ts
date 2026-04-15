@@ -19,7 +19,7 @@ export interface ParsedTransaction {
 /** Extract all text from a PDF file as a single string per page. */
 export async function extractTextFromPDF(file: File): Promise<string[]> {
   const pdfjsLib = await import("pdfjs-dist");
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -62,8 +62,18 @@ export async function extractTextFromPDF(file: File): Promise<string[]> {
 // ─── Date Parsing ─────────────────────────────────────────────
 
 const MONTHS: Record<string, string> = {
-  jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
-  jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+  jan: "01",
+  feb: "02",
+  mar: "03",
+  apr: "04",
+  may: "05",
+  jun: "06",
+  jul: "07",
+  aug: "08",
+  sep: "09",
+  oct: "10",
+  nov: "11",
+  dec: "12",
 };
 
 // DD/MM/YYYY or DD-MM-YYYY
@@ -197,7 +207,7 @@ function parseDBS(allText: string): ParsedTransaction[] {
     if (currentDate && currentAmounts.length > 0) {
       const { description, notes } = cleanDescription(currentDescLines);
 
-      // In DBS format: if there are 2 amounts on the same transaction, 
+      // In DBS format: if there are 2 amounts on the same transaction,
       // the last one is the balance. The first is the actual amount.
       // If there are 3 amounts: withdrawal, deposit, balance — pick the non-balance.
       let amount: number;
