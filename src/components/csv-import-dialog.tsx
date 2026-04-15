@@ -528,8 +528,12 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                     <p className="text-lg font-bold tabular-nums">{startingBalance.toFixed(2)}</p>
                     <p className="text-xs text-muted-foreground">Current Bal</p>
                   </div>
-                  <div className={`rounded-lg p-3 text-center ${adjustBalance ? (finalBalance >= startingBalance ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-red-50 dark:bg-red-950/30") : "bg-muted/50"}`}>
-                    <p className={`text-lg font-bold tabular-nums ${adjustBalance ? (finalBalance >= startingBalance ? "text-emerald-600" : "text-red-500") : ""}`}>{adjustBalance ? finalBalance.toFixed(2) : startingBalance.toFixed(2)}</p>
+                  <div
+                    className={`rounded-lg p-3 text-center ${adjustBalance ? (finalBalance >= startingBalance ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-red-50 dark:bg-red-950/30") : "bg-muted/50"}`}
+                  >
+                    <p className={`text-lg font-bold tabular-nums ${adjustBalance ? (finalBalance >= startingBalance ? "text-emerald-600" : "text-red-500") : ""}`}>
+                      {adjustBalance ? finalBalance.toFixed(2) : startingBalance.toFixed(2)}
+                    </p>
                     <p className="text-xs text-muted-foreground">After Import</p>
                   </div>
                 </div>
@@ -613,9 +617,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                             />
                           </TableCell>
                           {hasStatementBalance && (
-                            <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                              {row.statementBalance != null ? row.statementBalance.toFixed(2) : "—"}
-                            </TableCell>
+                            <TableCell className="text-right text-sm tabular-nums text-muted-foreground">{row.statementBalance != null ? row.statementBalance.toFixed(2) : "—"}</TableCell>
                           )}
                           <TableCell className={`text-right text-sm tabular-nums font-medium ${(runningBalances.get(row.id) ?? 0) < 0 ? "text-red-500" : "text-muted-foreground"}`}>
                             {(runningBalances.get(row.id) ?? 0).toFixed(2)}
