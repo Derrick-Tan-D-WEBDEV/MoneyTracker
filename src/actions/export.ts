@@ -4,12 +4,14 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
 import { getViewUser } from "@/lib/partner-view";
+import { getEncryptionKey, decrypt } from "@/lib/encryption";
 
 export async function getExportData(options: { startDate?: string; endDate?: string; type?: string }) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
   const { id: userId, currency: userCurrency } = await getViewUser();
+  const encKey = await getEncryptionKey();
   const rates = await getExchangeRates(userCurrency);
 
   const where: Record<string, unknown> = {
@@ -43,18 +45,18 @@ export async function getExportData(options: { startDate?: string; endDate?: str
   return {
     transactions: transactions.map((t) => ({
       date: t.date.toISOString(),
-      description: t.description,
+      description: decrypt(t.description, encKey),
       type: t.type,
       category: t.category?.name || "",
-      account: t.account.name,
+      account: decrypt(t.account.name, encKey),
       accountCurrency: t.account.currency,
       amount: Number(t.amount),
       amountInUserCurrency: convertCurrency(Number(t.amount), t.account.currency, userCurrency, rates),
-      tags: t.tags.map((tag) => tag.name).join(", "),
-      notes: t.notes || "",
+      tags: t.tags.map((tag) => decrypt(tag.name, encKey)).join(", "),
+      notes: t.notes ? decrypt(t.notes, encKey) : "",
     })),
     accounts: accounts.map((a) => ({
-      name: a.name,
+      name: decrypt(a.name, encKey),
       type: a.type,
       balance: Number(a.balance),
       reservedAmount: Number(a.reservedAmount),

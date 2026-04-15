@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getViewUserId } from "@/lib/partner-view";
+import { getEncryptionKey, encrypt, decrypt } from "@/lib/encryption";
 
 const wishlistSchema = z.object({
   name: z.string().min(1),
@@ -18,6 +19,7 @@ const wishlistSchema = z.object({
 
 export async function getWishlistItems() {
   const userId = await getViewUserId();
+  const encKey = await getEncryptionKey();
 
   const items = await db.wishlistItem.findMany({
     where: { userId },
@@ -26,13 +28,13 @@ export async function getWishlistItems() {
 
   return items.map((item) => ({
     id: item.id,
-    name: item.name,
+    name: decrypt(item.name, encKey),
     estimatedCost: Number(item.estimatedCost),
     currency: item.currency,
     priority: item.priority,
     targetDate: item.targetDate?.toISOString() ?? null,
-    url: item.url,
-    notes: item.notes,
+    url: item.url ? decrypt(item.url, encKey) : item.url,
+    notes: item.notes ? decrypt(item.notes, encKey) : item.notes,
     isPurchased: item.isPurchased,
     createdAt: item.createdAt.toISOString(),
   }));
@@ -41,19 +43,20 @@ export async function getWishlistItems() {
 export async function createWishlistItem(data: z.input<typeof wishlistSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const parsed = wishlistSchema.parse(data);
 
   await db.wishlistItem.create({
     data: {
       userId: session.user.id,
-      name: parsed.name,
+      name: encrypt(parsed.name, encKey),
       estimatedCost: parsed.estimatedCost,
       currency: parsed.currency,
       priority: parsed.priority,
       targetDate: parsed.targetDate ? new Date(parsed.targetDate) : null,
-      url: parsed.url || null,
-      notes: parsed.notes || null,
+      url: parsed.url ? encrypt(parsed.url, encKey) : null,
+      notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
     },
   });
 
@@ -80,6 +83,7 @@ export async function toggleWishlistItem(id: string) {
 export async function updateWishlistItem(id: string, data: z.input<typeof wishlistSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const existing = await db.wishlistItem.findFirst({
     where: { id, userId: session.user.id },
@@ -91,13 +95,13 @@ export async function updateWishlistItem(id: string, data: z.input<typeof wishli
   await db.wishlistItem.update({
     where: { id },
     data: {
-      name: parsed.name,
+      name: encrypt(parsed.name, encKey),
       estimatedCost: parsed.estimatedCost,
       currency: parsed.currency,
       priority: parsed.priority,
       targetDate: parsed.targetDate ? new Date(parsed.targetDate) : null,
-      url: parsed.url || null,
-      notes: parsed.notes || null,
+      url: parsed.url ? encrypt(parsed.url, encKey) : null,
+      notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
     },
   });
 

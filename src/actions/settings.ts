@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { SUPPORTED_CURRENCIES, DATE_FORMATS } from "@/lib/constants";
+import { getEncryptionKey, deriveKey, reEncryptUserData } from "@/lib/encryption";
 
 const profileSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
@@ -87,7 +88,7 @@ export async function updatePassword(data: z.input<typeof passwordSchema>) {
 
   const user = await db.user.findUnique({
     where: { id: session.user.id },
-    select: { password: true },
+    select: { password: true, encryptionSalt: true },
   });
 
   if (!user) throw new Error("User not found");
@@ -98,6 +99,13 @@ export async function updatePassword(data: z.input<typeof passwordSchema>) {
   }
 
   const hashedPassword = await bcrypt.hash(parsed.newPassword, 12);
+
+  // Re-encrypt all user data with new key derived from new password
+  if (user.encryptionSalt) {
+    const oldKey = await getEncryptionKey();
+    const newKey = deriveKey(parsed.newPassword, user.encryptionSalt);
+    await reEncryptUserData(session.user.id, oldKey, newKey);
+  }
 
   await db.user.update({
     where: { id: session.user.id },

@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { getEncryptionKey, encrypt, decrypt } from "@/lib/encryption";
 
 function getNextDueDate(current: Date, frequency: string): Date {
   const next = new Date(current);
@@ -38,6 +39,7 @@ const recurringSchema = z.object({
 export async function createRecurringRule(data: z.input<typeof recurringSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const parsed = recurringSchema.parse(data);
 
@@ -55,9 +57,9 @@ export async function createRecurringRule(data: z.input<typeof recurringSchema>)
       categoryId: parsed.categoryId || null,
       type: parsed.type,
       amount: parsed.amount,
-      description: parsed.description,
+      description: encrypt(parsed.description, encKey),
       date: parsed.nextDue,
-      notes: parsed.notes || null,
+      notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
       isRecurring: true,
     },
   });
@@ -108,7 +110,7 @@ export async function processRecurringTransactions() {
         amount: t.amount,
         description: t.description,
         date: rule.nextDue,
-        notes: t.notes ? `[Recurring] ${t.notes}` : "[Recurring]",
+        notes: t.notes,
       },
     });
 
@@ -140,6 +142,7 @@ export async function processRecurringTransactions() {
 export async function getRecurringRules() {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const rules = await db.recurringRule.findMany({
     where: {
@@ -160,12 +163,12 @@ export async function getRecurringRules() {
     isActive: r.isActive,
     transaction: {
       id: r.transaction.id,
-      description: r.transaction.description,
+      description: decrypt(r.transaction.description, encKey),
       amount: Number(r.transaction.amount),
       type: r.transaction.type,
-      notes: r.transaction.notes,
+      notes: r.transaction.notes ? decrypt(r.transaction.notes, encKey) : r.transaction.notes,
       category: r.transaction.category ? { id: r.transaction.category.id, name: r.transaction.category.name, color: r.transaction.category.color, icon: r.transaction.category.icon } : null,
-      account: { id: r.transaction.account.id, name: r.transaction.account.name, currency: r.transaction.account.currency },
+      account: { id: r.transaction.account.id, name: decrypt(r.transaction.account.name, encKey), currency: r.transaction.account.currency },
     },
   }));
 }
@@ -192,6 +195,7 @@ export async function toggleRecurringRule(id: string, isActive: boolean) {
 export async function updateRecurringRule(id: string, data: z.input<typeof recurringSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const rule = await db.recurringRule.findFirst({
     where: { id, transaction: { userId: session.user.id } },
@@ -215,8 +219,8 @@ export async function updateRecurringRule(id: string, data: z.input<typeof recur
       categoryId: parsed.categoryId || null,
       type: parsed.type,
       amount: parsed.amount,
-      description: parsed.description,
-      notes: parsed.notes || null,
+      description: encrypt(parsed.description, encKey),
+      notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
     },
   });
 

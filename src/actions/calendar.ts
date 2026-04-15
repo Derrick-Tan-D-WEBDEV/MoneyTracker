@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
 import { getViewUserId } from "@/lib/partner-view";
+import { getEncryptionKey, decrypt } from "@/lib/encryption";
 
 export interface CalendarEvent {
   id: string;
@@ -20,6 +21,7 @@ export async function getBillCalendarData(month?: number, year?: number) {
   if (!session?.user?.id) throw new Error("Unauthorized");
 
   const userId = await getViewUserId();
+  const encKey = await getEncryptionKey();
   const now = new Date();
   const targetMonth = month ?? now.getMonth();
   const targetYear = year ?? now.getFullYear();
@@ -36,7 +38,7 @@ export async function getBillCalendarData(month?: number, year?: number) {
       const day = Math.min(debt.dueDay, daysInMonth);
       events.push({
         id: `debt-${debt.id}`,
-        name: debt.name,
+        name: decrypt(debt.name, encKey),
         amount: Number(debt.minimumPayment),
         currency: debt.currency,
         date: new Date(targetYear, targetMonth, day).toISOString(),
@@ -56,7 +58,7 @@ export async function getBillCalendarData(month?: number, year?: number) {
     const day = Math.min(startDay, daysInMonth);
     events.push({
       id: `inst-${inst.id}`,
-      name: inst.name,
+      name: decrypt(inst.name, encKey),
       amount: Number(inst.monthlyPayment),
       currency: inst.currency,
       date: new Date(targetYear, targetMonth, day).toISOString(),
@@ -78,7 +80,7 @@ export async function getBillCalendarData(month?: number, year?: number) {
     if (nextDue.getMonth() === targetMonth && nextDue.getFullYear() === targetYear) {
       events.push({
         id: `rec-${rule.id}`,
-        name: tx.description,
+        name: decrypt(tx.description, encKey),
         amount: Number(tx.amount),
         currency: tx.account.currency,
         date: nextDue.toISOString(),
@@ -99,7 +101,7 @@ export async function getBillCalendarData(month?: number, year?: number) {
     if (sub.frequency === "MONTHLY" || sub.frequency === "WEEKLY") {
       events.push({
         id: `sub-${sub.id}`,
-        name: sub.name,
+        name: decrypt(sub.name, encKey),
         amount: Number(sub.amount),
         currency: sub.currency,
         date: new Date(targetYear, targetMonth, day).toISOString(),

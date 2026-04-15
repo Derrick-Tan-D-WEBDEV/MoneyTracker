@@ -5,9 +5,11 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getViewUserId } from "@/lib/partner-view";
+import { getEncryptionKey, encrypt, decrypt } from "@/lib/encryption";
 
 export async function getTags() {
   const userId = await getViewUserId();
+  const encKey = await getEncryptionKey();
 
   const tags = await db.tag.findMany({
     where: { userId },
@@ -16,7 +18,7 @@ export async function getTags() {
 
   return tags.map((t) => ({
     id: t.id,
-    name: t.name,
+    name: decrypt(t.name, encKey),
     color: t.color,
   }));
 }
@@ -29,19 +31,20 @@ const tagSchema = z.object({
 export async function createTag(data: z.input<typeof tagSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const parsed = tagSchema.parse(data);
 
   const tag = await db.tag.create({
     data: {
       userId: session.user.id,
-      name: parsed.name,
+      name: encrypt(parsed.name, encKey),
       color: parsed.color,
     },
   });
 
   revalidatePath("/transactions");
-  return { id: tag.id, name: tag.name, color: tag.color };
+  return { id: tag.id, name: parsed.name, color: tag.color };
 }
 
 export async function deleteTag(id: string) {

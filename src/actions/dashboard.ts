@@ -4,12 +4,14 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
 import { getViewUser, isPartnerView } from "@/lib/partner-view";
+import { getEncryptionKey, decrypt } from "@/lib/encryption";
 
 export async function getDashboardData() {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
   const { id: userId, currency: userCurrency } = await getViewUser();
+  const encKey = await getEncryptionKey();
   const rates = await getExchangeRates(userCurrency);
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -161,7 +163,7 @@ export async function getDashboardData() {
     const currentAmount = toUser(Number(g.currentAmount), goalCurrency);
     return {
       id: g.id,
-      name: g.name,
+      name: decrypt(g.name, encKey),
       targetAmount,
       currentAmount,
       type: g.type,
@@ -252,18 +254,18 @@ export async function getDashboardData() {
     monthlyTrend,
     recentTransactions: recentTransactions.map((t) => ({
       id: t.id,
-      description: t.description,
+      description: decrypt(t.description, encKey),
       amount: Number(t.amount),
       type: t.type,
       date: t.date.toISOString(),
       category: t.category?.name || "Uncategorized",
       categoryColor: t.category?.color || "#6B7280",
-      account: t.account.name,
+      account: decrypt(t.account.name, encKey),
       currency: t.account.currency,
     })),
     accounts: accounts.map((a) => ({
       id: a.id,
-      name: a.name,
+      name: decrypt(a.name, encKey),
       type: a.type,
       balance: Number(a.balance),
       reservedAmount: Number(a.reservedAmount),
@@ -276,7 +278,7 @@ export async function getDashboardData() {
       activeCount: activeDebts.length,
       items: activeDebts.slice(0, 3).map((d) => ({
         id: d.id,
-        name: d.name,
+        name: decrypt(d.name, encKey),
         type: d.type,
         remainingAmount: Number(d.remainingAmount),
         originalAmount: Number(d.originalAmount),

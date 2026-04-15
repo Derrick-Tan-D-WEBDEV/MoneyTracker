@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getViewUserId } from "@/lib/partner-view";
+import { getEncryptionKey, encrypt, decrypt } from "@/lib/encryption";
 
 const assetSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -31,6 +32,7 @@ const assetSchema = z.object({
 
 export async function getAssets() {
   const userId = await getViewUserId();
+  const encKey = await getEncryptionKey();
 
   const assets = await db.asset.findMany({
     where: { userId },
@@ -39,19 +41,19 @@ export async function getAssets() {
 
   return assets.map((a) => ({
     id: a.id,
-    name: a.name,
+    name: decrypt(a.name, encKey),
     type: a.type,
     purchasePrice: Number(a.purchasePrice),
     currentValue: Number(a.currentValue),
     currency: a.currency,
     purchaseDate: a.purchaseDate?.toISOString() || null,
     lastValuedDate: a.lastValuedDate?.toISOString() || null,
-    location: a.location,
-    description: a.description,
+    location: a.location ? decrypt(a.location, encKey) : a.location,
+    description: a.description ? decrypt(a.description, encKey) : a.description,
     icon: a.icon,
     color: a.color,
     isSold: a.isSold,
-    notes: a.notes,
+    notes: a.notes ? decrypt(a.notes, encKey) : a.notes,
     createdAt: a.createdAt.toISOString(),
     // Computed
     gainLoss: Number(a.currentValue) - Number(a.purchasePrice),
@@ -62,12 +64,17 @@ export async function getAssets() {
 export async function createAsset(data: z.input<typeof assetSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const parsed = assetSchema.parse(data);
 
   const asset = await db.asset.create({
     data: {
       ...parsed,
+      name: encrypt(parsed.name, encKey),
+      location: parsed.location ? encrypt(parsed.location, encKey) : parsed.location,
+      description: parsed.description ? encrypt(parsed.description, encKey) : parsed.description,
+      notes: parsed.notes ? encrypt(parsed.notes, encKey) : parsed.notes,
       userId: session.user.id,
     },
   });
@@ -80,6 +87,7 @@ export async function createAsset(data: z.input<typeof assetSchema>) {
 export async function updateAsset(id: string, data: z.input<typeof assetSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const existing = await db.asset.findFirst({
     where: { id, userId: session.user.id },
@@ -90,7 +98,13 @@ export async function updateAsset(id: string, data: z.input<typeof assetSchema>)
 
   await db.asset.update({
     where: { id },
-    data: parsed,
+    data: {
+      ...parsed,
+      name: encrypt(parsed.name, encKey),
+      location: parsed.location ? encrypt(parsed.location, encKey) : parsed.location,
+      description: parsed.description ? encrypt(parsed.description, encKey) : parsed.description,
+      notes: parsed.notes ? encrypt(parsed.notes, encKey) : parsed.notes,
+    },
   });
 
   revalidatePath("/");

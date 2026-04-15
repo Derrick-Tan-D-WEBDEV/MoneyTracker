@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getViewUserId } from "@/lib/partner-view";
+import { getEncryptionKey, encrypt, decrypt } from "@/lib/encryption";
 
 const goalSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -29,6 +30,7 @@ const goalSchema = z.object({
 
 export async function getGoals() {
   const userId = await getViewUserId();
+  const encKey = await getEncryptionKey();
 
   const goals = await db.goal.findMany({
     where: { userId },
@@ -64,7 +66,7 @@ export async function getGoals() {
 
     return {
       id: g.id,
-      name: g.name,
+      name: decrypt(g.name, encKey),
       targetAmount,
       currentAmount,
       currency: g.currency,
@@ -77,7 +79,7 @@ export async function getGoals() {
       percentage,
       remaining,
       monthsToGoal,
-      account: g.account ? { id: g.account.id, name: g.account.name, type: g.account.type, currency: g.account.currency } : null,
+      account: g.account ? { id: g.account.id, name: decrypt(g.account.name, encKey), type: g.account.type, currency: g.account.currency } : null,
     };
   });
 }
@@ -85,6 +87,7 @@ export async function getGoals() {
 export async function createGoal(data: z.input<typeof goalSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const parsed = goalSchema.parse(data);
   const { accountId, ...rest } = parsed;
@@ -100,6 +103,7 @@ export async function createGoal(data: z.input<typeof goalSchema>) {
   const goal = await db.goal.create({
     data: {
       ...rest,
+      name: encrypt(rest.name, encKey),
       accountId: accountId || null,
       userId: session.user.id,
     },
@@ -118,6 +122,7 @@ export async function checkGoalAchievements() {
 export async function updateGoal(id: string, data: z.input<typeof goalSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const existing = await db.goal.findFirst({
     where: { id, userId: session.user.id },
@@ -136,7 +141,7 @@ export async function updateGoal(id: string, data: z.input<typeof goalSchema>) {
 
   await db.goal.update({
     where: { id },
-    data: { ...rest, accountId: accountId || null },
+    data: { ...rest, name: encrypt(rest.name, encKey), accountId: accountId || null },
   });
 
   revalidatePath("/");

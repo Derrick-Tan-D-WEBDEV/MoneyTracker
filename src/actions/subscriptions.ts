@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getViewUserId } from "@/lib/partner-view";
+import { getEncryptionKey, encrypt, decrypt } from "@/lib/encryption";
 
 const subscriptionSchema = z.object({
   name: z.string().min(1),
@@ -21,6 +22,7 @@ const subscriptionSchema = z.object({
 
 export async function getSubscriptions() {
   const userId = await getViewUserId();
+  const encKey = await getEncryptionKey();
 
   const subscriptions = await db.subscription.findMany({
     where: { userId },
@@ -30,39 +32,40 @@ export async function getSubscriptions() {
 
   return subscriptions.map((s) => ({
     id: s.id,
-    name: s.name,
+    name: decrypt(s.name, encKey),
     amount: Number(s.amount),
     currency: s.currency,
     frequency: s.frequency,
     nextBillingDate: s.nextBillingDate.toISOString(),
     category: s.category ? { id: s.category.id, name: s.category.name, color: s.category.color } : null,
-    url: s.url,
+    url: s.url ? decrypt(s.url, encKey) : s.url,
     icon: s.icon,
     color: s.color,
     isActive: s.isActive,
-    notes: s.notes,
+    notes: s.notes ? decrypt(s.notes, encKey) : s.notes,
   }));
 }
 
 export async function createSubscription(data: z.input<typeof subscriptionSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const parsed = subscriptionSchema.parse(data);
 
   await db.subscription.create({
     data: {
       userId: session.user.id,
-      name: parsed.name,
+      name: encrypt(parsed.name, encKey),
       amount: parsed.amount,
       currency: parsed.currency,
       frequency: parsed.frequency,
       nextBillingDate: parsed.nextBillingDate,
       categoryId: parsed.categoryId || null,
-      url: parsed.url || null,
+      url: parsed.url ? encrypt(parsed.url, encKey) : null,
       icon: parsed.icon || "repeat",
       color: parsed.color || "#8B5CF6",
-      notes: parsed.notes || null,
+      notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
     },
   });
 
@@ -91,6 +94,7 @@ export async function toggleSubscription(id: string) {
 export async function updateSubscription(id: string, data: z.input<typeof subscriptionSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const existing = await db.subscription.findFirst({
     where: { id, userId: session.user.id },
@@ -102,14 +106,14 @@ export async function updateSubscription(id: string, data: z.input<typeof subscr
   await db.subscription.update({
     where: { id },
     data: {
-      name: parsed.name,
+      name: encrypt(parsed.name, encKey),
       amount: parsed.amount,
       currency: parsed.currency,
       frequency: parsed.frequency,
       nextBillingDate: parsed.nextBillingDate,
       categoryId: parsed.categoryId || null,
-      url: parsed.url || null,
-      notes: parsed.notes || null,
+      url: parsed.url ? encrypt(parsed.url, encKey) : null,
+      notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
     },
   });
 
