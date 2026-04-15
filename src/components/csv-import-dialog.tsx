@@ -322,7 +322,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-5xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {step === "upload" && "Import Transactions"}
