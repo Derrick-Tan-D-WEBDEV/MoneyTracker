@@ -23,7 +23,12 @@ RUN npx prisma generate
 # Build Next.js (standalone output)
 RUN npm run build
 
-# ── Stage 3: Production image ───────────────────────────────────────
+# ── Stage 3: Prisma CLI (independent stage — cached after first build) ──
+FROM node:20-alpine AS prisma-cli
+WORKDIR /prisma-install
+RUN npm init -y && npm install --no-save prisma@7.7.0
+
+# ── Stage 4: Production image ───────────────────────────────────────
 FROM node:20-alpine AS runner
 WORKDIR /app
 
@@ -41,9 +46,8 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Copy Prisma CLI + engines from deps (reuses existing install — no extra npm install)
-COPY --from=deps /app/node_modules/prisma ./node_modules/prisma
-COPY --from=deps /app/node_modules/@prisma ./node_modules/@prisma
+# Copy Prisma CLI + all its deps from cached stage
+COPY --from=prisma-cli /prisma-install/node_modules ./node_modules
 
 # Copy Prisma schema + migrations for runtime migration
 COPY --from=builder /app/prisma ./prisma
