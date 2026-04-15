@@ -511,7 +511,9 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                 {duplicateCount > 0 && (
                   <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3">
                     <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{duplicateCount} potential duplicate{duplicateCount > 1 ? "s" : ""} found (auto-deselected). You can still re-select them if needed.</span>
+                    <span>
+                      {duplicateCount} potential duplicate{duplicateCount > 1 ? "s" : ""} found (auto-deselected). You can still re-select them if needed.
+                    </span>
                   </div>
                 )}
 

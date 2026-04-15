@@ -367,10 +367,7 @@ export async function importTransactions(rows: z.input<typeof importRowSchema>[]
   return { imported, skipped, total: rows.length };
 }
 
-export async function checkDuplicateTransactions(
-  accountId: string,
-  rows: { date: string; amount: number }[],
-): Promise<Set<string>> {
+export async function checkDuplicateTransactions(accountId: string, rows: { date: string; amount: number }[]): Promise<Set<string>> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
   const encKey = await getEncryptionKey();
