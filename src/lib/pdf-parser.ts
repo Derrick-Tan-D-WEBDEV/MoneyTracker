@@ -191,32 +191,43 @@ function cleanDescription(lines: string[]): { description: string; notes: string
 
 /**
  * Parse DBS/POSB statement text.
- * Format: date line starts with DD/MM/YYYY, followed by description lines,
- * then amounts appear on the date line or nearby lines.
- * Withdrawal and Deposit are in separate column positions.
+ * Uses the Balance column to determine INCOME vs EXPENSE:
+ * if balance increased from previous → INCOME, if decreased → EXPENSE.
+ * Amount is derived from the balance difference for accuracy.
  */
 function parseDBS(allText: string): ParsedTransaction[] {
   const transactions: ParsedTransaction[] = [];
   const lines = allText.split("\n");
 
+  let previousBalance: number | null = null;
   let currentDate: string | null = null;
   let currentDescLines: string[] = [];
   let currentAmounts: number[] = [];
-  let isDeposit = false;
 
   const flushTransaction = () => {
     if (currentDate && currentAmounts.length > 0) {
       const { description, notes } = cleanDescription(currentDescLines);
 
-      // In DBS format: if there are 2 amounts on the same transaction,
-      // the last one is the balance. The first is the actual amount.
-      // If there are 3 amounts: withdrawal, deposit, balance — pick the non-balance.
       let amount: number;
       let statementBalance: number | null = null;
+      let type: "INCOME" | "EXPENSE" = "EXPENSE";
+
+      // Last amount is always the balance in DBS statements
       if (currentAmounts.length >= 2) {
-        amount = currentAmounts[0]; // First amount is the transaction amount
-        statementBalance = currentAmounts[currentAmounts.length - 1]; // Last is balance
+        statementBalance = currentAmounts[currentAmounts.length - 1];
+
+        if (previousBalance !== null) {
+          // Determine type from balance change — this is definitive
+          const diff = statementBalance - previousBalance;
+          type = diff >= 0 ? "INCOME" : "EXPENSE";
+          amount = Math.round(Math.abs(diff) * 100) / 100;
+        } else {
+          amount = currentAmounts[0];
+        }
+
+        previousBalance = statementBalance;
       } else {
+        // Single amount — no balance column available
         amount = currentAmounts[0];
       }
 
@@ -225,7 +236,7 @@ function parseDBS(allText: string): ParsedTransaction[] {
           date: currentDate,
           description,
           amount,
-          type: isDeposit ? "INCOME" : "EXPENSE",
+          type,
           notes,
           statementBalance,
         });
@@ -234,45 +245,44 @@ function parseDBS(allText: string): ParsedTransaction[] {
     currentDate = null;
     currentDescLines = [];
     currentAmounts = [];
-    isDeposit = false;
   };
 
   for (const line of lines) {
+    // Extract starting balance from "Balance Brought Forward" lines
+    if (/balance brought forward/i.test(line)) {
+      const amounts = extractAmounts(line);
+      if (amounts.length > 0) {
+        previousBalance = amounts[amounts.length - 1];
+      }
+      continue;
+    }
+
+    // Skip balance carried forward and other noise
+    if (/balance carried forward/i.test(line)) continue;
     if (isNoiseLine(line)) continue;
 
     const date = parseDate(line);
     if (date) {
-      // Flush previous transaction
       flushTransaction();
       currentDate = date;
 
-      // Extract amounts and description from this date line
       const amounts = extractAmounts(line);
       if (amounts.length > 0) {
         currentAmounts = amounts;
       }
 
-      // Check the text after the date for the description start
       const afterDate = line.replace(DATE_DMY, "").trim();
-      // Remove amounts from description
       const descPart = afterDate.replace(AMOUNT_RE, "").trim();
       if (descPart) {
         currentDescLines.push(descPart);
       }
-
-      // Detect if this is a deposit (income) by checking column positioning
-      // In DBS: deposits appear in a different column position than withdrawals
-      // Heuristic: if text has amounts in later positions, check spacing
-      // Simpler: check if "INCOMING" keyword exists in description lines later
     } else if (currentDate) {
-      // Continuation line for current transaction
       const amounts = extractAmounts(line);
       const textWithoutAmounts = line.replace(AMOUNT_RE, "").trim();
 
       if (amounts.length > 0 && currentAmounts.length === 0) {
         currentAmounts = amounts;
       } else if (amounts.length > 0) {
-        // Additional amounts — could be deposit+balance or just balance
         currentAmounts.push(...amounts);
       }
 
@@ -281,17 +291,7 @@ function parseDBS(allText: string): ParsedTransaction[] {
       }
     }
   }
-  // Flush last transaction
   flushTransaction();
-
-  // Post-process: determine INCOME/EXPENSE
-  // Look at description lines for "INCOMING" keyword
-  for (const tx of transactions) {
-    const allText = tx.description + " " + (tx.notes || "");
-    if (/incoming|deposit|send back from paylah/i.test(allText)) {
-      tx.type = "INCOME";
-    }
-  }
 
   return transactions;
 }
