@@ -228,7 +228,7 @@ export async function getPartnerDashboardData() {
   } catch {
     // Partner hasn't logged in since encryption was enabled
   }
-  const da = (val: unknown) => encKey ? decryptAmount(val, encKey) : Number(val) || 0;
+  const da = (val: unknown) => (encKey ? decryptAmount(val, encKey) : Number(val) || 0);
 
   const accountBalance = accounts.reduce((sum, acc) => {
     const bal = da(acc.balance) - da(acc.reservedAmount);
