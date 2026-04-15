@@ -57,6 +57,7 @@ export async function getExportData(options: { startDate?: string; endDate?: str
       name: a.name,
       type: a.type,
       balance: Number(a.balance),
+      reservedAmount: Number(a.reservedAmount),
       currency: a.currency,
     })),
     budgets: budgets.map((b) => ({

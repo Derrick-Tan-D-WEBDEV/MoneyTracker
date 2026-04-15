@@ -32,7 +32,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <AppSidebar />
             <div className="md:pl-16">
               <TopNav linkedPartner={linkedPartner} />
-              <main className="p-4 md:p-6 pb-24 md:pb-6">
+              <main className="p-4 md:p-6 pb-36 md:pb-24">
                 <DashboardShell>{children}</DashboardShell>
               </main>
             </div>

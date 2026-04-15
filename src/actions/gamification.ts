@@ -269,11 +269,12 @@ async function checkBalanceAchievements(userId: string, results: string[]) {
 
   const accounts = await db.financialAccount.findMany({
     where: { userId, isArchived: false },
-    select: { balance: true, currency: true, type: true, creditLimit: true },
+    select: { balance: true, reservedAmount: true, currency: true, type: true, creditLimit: true },
   });
   // Convert all balances to USD for consistent achievement thresholds
   const totalBalanceUSD = accounts.reduce((sum, a) => {
-    const converted = convertCurrency(Number(a.balance), a.currency, "USD", rates);
+    const effectiveBalance = Number(a.balance) - Number(a.reservedAmount);
+    const converted = convertCurrency(effectiveBalance, a.currency, "USD", rates);
     if (a.type === "CREDIT_CARD") {
       // Balance = available credit; liability = creditLimit - balance
       const limit = a.creditLimit ? convertCurrency(Number(a.creditLimit), a.currency, "USD", rates) : 0;

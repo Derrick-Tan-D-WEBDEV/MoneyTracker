@@ -21,6 +21,7 @@ import {
   ShoppingBag,
   Calculator,
   Heart,
+  Package,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ const navItems = [
   { href: "/accounts", icon: Wallet, label: "Accounts" },
   { href: "/budgets", icon: Target, label: "Budgets" },
   { href: "/investments", icon: TrendingUp, label: "Investments" },
+  { href: "/assets", icon: Package, label: "Assets" },
   { href: "/goals", icon: Flag, label: "Goals" },
   { href: "/debts", icon: Landmark, label: "Debts" },
   { href: "/installments", icon: CreditCard, label: "Installments" },

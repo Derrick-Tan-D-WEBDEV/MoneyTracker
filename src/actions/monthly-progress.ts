@@ -25,6 +25,10 @@ export interface MonthlyProgress {
   totalSavingsBalance: number;
   projectedInterestMonthly: number;
 
+  // Assets
+  totalAssetValue: number;
+  totalAssetCount: number;
+
   // Overall
   upcomingBills: { name: string; amount: number; dueDay: number; type: string }[];
   monthLabel: string;
@@ -73,7 +77,14 @@ export async function getMonthlyProgress(): Promise<MonthlyProgress> {
     where: { userId, type: "SAVINGS" },
   });
 
-  const totalSavingsBalance = savingsAccounts.reduce((s, a) => s + convertCurrency(Number(a.balance), a.currency, userCurrency, rates), 0);
+  const totalSavingsBalance = savingsAccounts.reduce((s, a) => s + convertCurrency(Number(a.balance) - Number(a.reservedAmount), a.currency, userCurrency, rates), 0);
+
+  // Assets
+  const activeAssets = await db.asset.findMany({
+    where: { userId, isSold: false },
+  });
+
+  const totalAssetValue = activeAssets.reduce((s, a) => s + convertCurrency(Number(a.currentValue), a.currency, userCurrency, rates), 0);
 
   // Project monthly interest from goals with interest rates
   const projectedInterestMonthly = goals.reduce((s, g) => {
@@ -125,6 +136,8 @@ export async function getMonthlyProgress(): Promise<MonthlyProgress> {
     goalContributionsThisMonth: Math.round(goalContributionsThisMonth * 100) / 100,
     totalSavingsBalance: Math.round(totalSavingsBalance * 100) / 100,
     projectedInterestMonthly: Math.round(projectedInterestMonthly * 100) / 100,
+    totalAssetValue: Math.round(totalAssetValue * 100) / 100,
+    totalAssetCount: activeAssets.length,
     upcomingBills: upcomingBills.slice(0, 5),
     monthLabel,
   };

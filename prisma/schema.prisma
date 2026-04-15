@@ -42,6 +42,7 @@ model User {
   wishlistItems     WishlistItem[]
   coupleLinksAsUser    CoupleLink[] @relation("CoupleLinkUser")
   coupleLinksAsPartner CoupleLink[] @relation("CoupleLinkPartner")
+  assets            Asset[]
 }
 
 model Account {
@@ -141,9 +142,10 @@ model FinancialAccount {
   userId       String      @db.Uuid
   name         String
   type         AccountType
-  balance      Decimal     @default(0) @db.Decimal(19, 4)
-  currency     String      @default("USD")
-  color        String      @default("#3B82F6")
+  balance        Decimal     @default(0) @db.Decimal(19, 4)
+  reservedAmount Decimal     @default(0) @db.Decimal(19, 4) // Money parked that isn't the user's
+  currency       String      @default("USD")
+  color          String      @default("#3B82F6")
   icon         String      @default("wallet")
   isArchived   Boolean     @default(false)
   creditLimit  Decimal?    @db.Decimal(19, 4) // For CREDIT_CARD accounts
@@ -449,6 +451,37 @@ model WishlistItem {
 }
 
 // ─── Couple Linking ────────────────────────────────────────────────
+
+enum AssetType {
+  PROPERTY
+  VEHICLE
+  COLLECTIBLE
+  OTHER
+}
+
+model Asset {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @db.Uuid
+  name             String
+  type             AssetType @default(OTHER)
+  purchasePrice    Decimal   @db.Decimal(19, 4)
+  currentValue     Decimal   @db.Decimal(19, 4)
+  currency         String    @default("USD")
+  purchaseDate     DateTime?
+  lastValuedDate   DateTime?
+  location         String?   // Address for property, etc.
+  description      String?
+  icon             String    @default("package")
+  color            String    @default("#6366F1")
+  isSold           Boolean   @default(false)
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
 
 enum CoupleLinkStatus {
   PENDING

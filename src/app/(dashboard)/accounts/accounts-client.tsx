@@ -36,6 +36,7 @@ interface Account {
   name: string;
   type: string;
   balance: number;
+  reservedAmount: number;
   currency: string;
   color: string;
   icon: string;
@@ -67,6 +68,7 @@ export function AccountsClient() {
   const [formCurrency, setFormCurrency] = useState(userCurrency);
   const [formCreditLimit, setFormCreditLimit] = useState("");
   const [formRepaymentDay, setFormRepaymentDay] = useState("");
+  const [formReservedAmount, setFormReservedAmount] = useState("0");
 
   const fetchAccounts = async () => {
     try {
@@ -91,6 +93,7 @@ export function AccountsClient() {
         name: formName,
         type: formType as "CHECKING" | "SAVINGS" | "CREDIT_CARD" | "CASH" | "INVESTMENT" | "CRYPTO" | "LOAN",
         balance: parseFloat(formBalance),
+        reservedAmount: parseFloat(formReservedAmount) || 0,
         currency: formCurrency,
         color: formColor,
         icon: "wallet",
@@ -115,6 +118,7 @@ export function AccountsClient() {
     setFormCurrency(account.currency);
     setFormCreditLimit(account.creditLimit ? String(account.creditLimit) : "");
     setFormRepaymentDay(account.repaymentDay ? String(account.repaymentDay) : "");
+    setFormReservedAmount(String(account.reservedAmount || 0));
     setEditDialogOpen(true);
   };
 
@@ -126,6 +130,7 @@ export function AccountsClient() {
         name: formName,
         type: formType as "CHECKING" | "SAVINGS" | "CREDIT_CARD" | "CASH" | "INVESTMENT" | "CRYPTO" | "LOAN",
         balance: parseFloat(formBalance),
+        reservedAmount: parseFloat(formReservedAmount) || 0,
         currency: formCurrency,
         color: formColor,
         icon: "wallet",
@@ -150,10 +155,12 @@ export function AccountsClient() {
     setFormCurrency(userCurrency);
     setFormCreditLimit("");
     setFormRepaymentDay("");
+    setFormReservedAmount("0");
   };
 
   const totalBalance = accounts.reduce((s, a) => {
-    const converted = a.currency === userCurrency ? a.balance : rates[a.currency] ? a.balance / rates[a.currency] : a.balance;
+    const effectiveBalance = a.balance - (a.reservedAmount || 0);
+    const converted = a.currency === userCurrency ? effectiveBalance : rates[a.currency] ? effectiveBalance / rates[a.currency] : effectiveBalance;
     if (a.type === "CREDIT_CARD") {
       // Balance = available credit; liability = creditLimit - balance (used)
       const limit = a.creditLimit != null ? (a.currency === userCurrency ? a.creditLimit : rates[a.currency] ? a.creditLimit / rates[a.currency] : a.creditLimit) : 0;
@@ -207,6 +214,14 @@ export function AccountsClient() {
                   <Label>{formType === "CREDIT_CARD" ? "Available Balance" : "Current Balance"}</Label>
                   <Input type="number" step="0.01" value={formBalance} onChange={(e) => setFormBalance(e.target.value)} required />
                 </div>
+
+                {formType !== "CREDIT_CARD" && (
+                  <div className="space-y-2">
+                    <Label>Reserved / Held Amount</Label>
+                    <Input type="number" step="0.01" min="0" placeholder="0" value={formReservedAmount} onChange={(e) => setFormReservedAmount(e.target.value)} />
+                    <p className="text-xs text-muted-foreground">Money parked in this account that isn&apos;t yours. Excluded from all statistics.</p>
+                  </div>
+                )}
 
                 {formType === "CREDIT_CARD" && (
                   <div className="grid grid-cols-2 gap-3">
@@ -341,6 +356,12 @@ export function AccountsClient() {
                   ) : (
                     <>
                       <p className="text-2xl font-bold mt-3 tabular-nums">{currencyFormatter(account.currency)(account.balance)}</p>
+                      {account.reservedAmount > 0 && (
+                        <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                          <span>Held: {currencyFormatter(account.currency)(account.reservedAmount)}</span>
+                          <span>Yours: {currencyFormatter(account.currency)(account.balance - account.reservedAmount)}</span>
+                        </div>
+                      )}
                       {account.type === "CREDIT_CARD" && account.repaymentDay != null && (
                         <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
                           <span>Due: Day {account.repaymentDay}</span>
@@ -398,6 +419,14 @@ export function AccountsClient() {
                 <Input type="number" step="0.01" value={formBalance} onChange={(e) => setFormBalance(e.target.value)} required />
                 {editingAccount && parseFloat(formBalance) !== editingAccount.balance && <p className="text-xs text-muted-foreground">Changing the balance will create an adjustment record</p>}
               </div>
+
+              {formType !== "CREDIT_CARD" && (
+                <div className="space-y-2">
+                  <Label>Reserved / Held Amount</Label>
+                  <Input type="number" step="0.01" min="0" placeholder="0" value={formReservedAmount} onChange={(e) => setFormReservedAmount(e.target.value)} />
+                  <p className="text-xs text-muted-foreground">Money parked in this account that isn&apos;t yours. Excluded from all statistics.</p>
+                </div>
+              )}
 
               {formType === "CREDIT_CARD" && (
                 <div className="grid grid-cols-2 gap-3">

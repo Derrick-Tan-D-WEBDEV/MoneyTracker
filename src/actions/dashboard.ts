@@ -30,7 +30,8 @@ export async function getDashboardData() {
   });
 
   const accountBalance = accounts.reduce((sum, acc) => {
-    const converted = toUser(Number(acc.balance), acc.currency);
+    const effectiveBalance = Number(acc.balance) - Number(acc.reservedAmount);
+    const converted = toUser(effectiveBalance, acc.currency);
     if (acc.type === "CREDIT_CARD") {
       // Balance = available credit; liability = creditLimit - balance
       const limit = acc.creditLimit ? toUser(Number(acc.creditLimit), acc.currency) : 0;
@@ -265,6 +266,7 @@ export async function getDashboardData() {
       name: a.name,
       type: a.type,
       balance: Number(a.balance),
+      reservedAmount: Number(a.reservedAmount),
       currency: a.currency,
       color: a.color,
     })),

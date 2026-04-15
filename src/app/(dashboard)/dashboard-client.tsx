@@ -98,6 +98,7 @@ interface DashboardData {
     name: string;
     type: string;
     balance: number;
+    reservedAmount: number;
     currency: string;
     color: string;
   }[];
@@ -351,7 +352,7 @@ export function DashboardClient({ data }: { data: DashboardData | null }) {
                       {acc.type.toLowerCase().replace("_", " ")} · {acc.currency}
                     </p>
                   </div>
-                  <p className="text-sm font-semibold tabular-nums">{fmt(acc.balance)}</p>
+                  <p className="text-sm font-semibold tabular-nums">{fmt(acc.balance - (acc.reservedAmount || 0))}</p>
                 </div>
               );
             })}
@@ -634,7 +635,7 @@ export function DashboardClient({ data }: { data: DashboardData | null }) {
       )}
 
       {/* Monthly Follow-up */}
-      {monthlyProgress && (monthlyProgress.activeDebts > 0 || monthlyProgress.activeInstallments > 0 || monthlyProgress.activeGoals > 0) && (
+      {monthlyProgress && (monthlyProgress.activeDebts > 0 || monthlyProgress.activeInstallments > 0 || monthlyProgress.activeGoals > 0 || monthlyProgress.totalAssetCount > 0) && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
@@ -681,6 +682,15 @@ export function DashboardClient({ data }: { data: DashboardData | null }) {
                   <p className="text-xs text-muted-foreground">Savings</p>
                   <p className="text-lg font-bold text-blue-500">{formatCurrency(monthlyProgress.totalSavingsBalance)}</p>
                   {monthlyProgress.projectedInterestMonthly > 0 && <p className="text-xs text-emerald-500">+{formatCurrency(monthlyProgress.projectedInterestMonthly)} interest/mo</p>}
+                </div>
+              )}
+              {monthlyProgress.totalAssetCount > 0 && (
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">Assets</p>
+                  <p className="text-lg font-bold text-indigo-500">{formatCurrency(monthlyProgress.totalAssetValue)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {monthlyProgress.totalAssetCount} asset{monthlyProgress.totalAssetCount !== 1 ? "s" : ""}
+                  </p>
                 </div>
               )}
             </div>

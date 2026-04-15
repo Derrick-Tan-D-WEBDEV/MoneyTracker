@@ -112,9 +112,9 @@ ${data.transactions
 <div class="accounts">
 <h2>Accounts</h2>
 <table>
-<thead><tr><th>Account</th><th>Type</th><th>Currency</th><th class="amount">Balance</th></tr></thead>
+<thead><tr><th>Account</th><th>Type</th><th>Currency</th><th class="amount">Balance</th><th class="amount">Reserved</th></tr></thead>
 <tbody>
-${data.accounts.map((a) => `<tr><td>${escapeHtml(a.name)}</td><td>${a.type}</td><td>${a.currency}</td><td class="amount">${a.currency} ${a.balance.toFixed(2)}</td></tr>`).join("")}
+${data.accounts.map((a) => `<tr><td>${escapeHtml(a.name)}</td><td>${a.type}</td><td>${a.currency}</td><td class="amount">${a.currency} ${a.balance.toFixed(2)}</td><td class="amount">${a.currency} ${(a.reservedAmount || 0).toFixed(2)}</td></tr>`).join("")}
 </tbody>
 </table>
 </div>

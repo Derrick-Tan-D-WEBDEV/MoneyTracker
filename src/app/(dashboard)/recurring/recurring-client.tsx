@@ -17,6 +17,8 @@ import { getRecurringRules, createRecurringRule, updateRecurringRule, toggleRecu
 import { getAccounts } from "@/actions/accounts";
 import { getCategories } from "@/actions/categories";
 import { currencyFormatter } from "@/lib/format";
+import { getExchangeRates as fetchExchangeRates } from "@/actions/exchange-rates";
+import { convertCurrency } from "@/lib/exchange-rates";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 
@@ -41,6 +43,7 @@ interface Account {
   name: string;
   type: string;
   balance: number;
+  reservedAmount: number;
   currency: string;
 }
 
@@ -78,6 +81,7 @@ export function RecurringClient() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<RecurringRule | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [rates, setRates] = useState<Record<string, number>>({});
 
   // Form state
   const [formType, setFormType] = useState<"EXPENSE" | "INCOME">("EXPENSE");
@@ -91,10 +95,11 @@ export function RecurringClient() {
 
   const fetchData = async () => {
     try {
-      const [rulesData, accts, cats] = await Promise.all([getRecurringRules(), getAccounts(), getCategories()]);
+      const [rulesData, accts, cats, rateData] = await Promise.all([getRecurringRules(), getAccounts(), getCategories(), fetchExchangeRates(userCurrency)]);
       setRules(rulesData as RecurringRule[]);
       setAccounts(accts as Account[]);
       setCategories(cats);
+      setRates(rateData);
     } catch {
       toast.error("Failed to load data");
     } finally {
@@ -201,10 +206,11 @@ export function RecurringClient() {
   const dueCount = rules.filter((r) => r.isActive && new Date(r.nextDue) <= new Date()).length;
 
   const activeCount = rules.filter((r) => r.isActive).length;
+  const toUser = (amount: number, from: string) => convertCurrency(amount, from, userCurrency, rates);
   const monthlyTotal = rules
     .filter((r) => r.isActive)
     .reduce((sum, r) => {
-      const amt = r.transaction.amount;
+      const amt = toUser(r.transaction.amount, r.transaction.account.currency);
       switch (r.frequency) {
         case "DAILY":
           return sum + amt * 30;

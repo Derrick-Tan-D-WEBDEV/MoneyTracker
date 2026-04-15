@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import { QuickAddFab } from "@/components/dashboard/quick-add-fab";
 import { AchievementToast } from "@/components/dashboard/achievement-toast";
 
@@ -10,6 +11,7 @@ interface ShellData {
 }
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
+  const { update: updateSession } = useSession();
   const [achievementKey, setAchievementKey] = useState<string | null>(null);
   const [shellData, setShellData] = useState<ShellData | null>(null);
 
@@ -29,14 +31,16 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         });
         // Auto-process any due recurring transactions in the background
         processRecurringTransactions().catch(() => {});
-        // Update daily login streak
-        updateStreak().catch(() => {});
+        // Update daily login streak, then refresh session so streak badge updates
+        updateStreak()
+          .then(() => updateSession())
+          .catch(() => {});
       } catch {
         // Not critical - FAB just won't show
       }
     }
     load();
-  }, []);
+  }, [updateSession]);
 
   const handleAchievement = useCallback((key: string) => {
     setAchievementKey(key);

@@ -222,7 +222,7 @@ export async function getPartnerDashboardData() {
   const toPC = (amount: number, from: string) => convertCurrency(amount, from, partnerCurrency, rates);
 
   const accountBalance = accounts.reduce((sum, acc) => {
-    const bal = Number(acc.balance);
+    const bal = Number(acc.balance) - Number(acc.reservedAmount);
     if (acc.type === "CREDIT_CARD") {
       const limit = acc.creditLimit ? Number(acc.creditLimit) : 0;
       return sum - toPC(limit - bal, acc.currency);
@@ -253,6 +253,7 @@ export async function getPartnerDashboardData() {
       name: a.name,
       type: a.type,
       balance: Number(a.balance),
+      reservedAmount: Number(a.reservedAmount),
       currency: a.currency,
       color: a.color,
       icon: a.icon,

@@ -24,6 +24,7 @@ import {
   Menu,
   X,
   Heart,
+  Package,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +38,7 @@ const primaryTabs = [
 const moreItems = [
   { href: "/budgets", icon: Target, label: "Budgets" },
   { href: "/investments", icon: TrendingUp, label: "Investments" },
+  { href: "/assets", icon: Package, label: "Assets" },
   { href: "/debts", icon: Landmark, label: "Debts" },
   { href: "/installments", icon: CreditCard, label: "Installments" },
   { href: "/calendar", icon: CalendarDays, label: "Bill Calendar" },

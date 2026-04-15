@@ -43,6 +43,7 @@ interface Account {
   name: string;
   type: string;
   balance: number;
+  reservedAmount: number;
 }
 
 interface Category {

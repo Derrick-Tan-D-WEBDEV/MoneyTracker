@@ -47,6 +47,7 @@ interface Account {
   name: string;
   type: string;
   balance: number;
+  reservedAmount: number;
   currency: string;
   color: string;
 }

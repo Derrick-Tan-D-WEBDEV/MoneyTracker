@@ -13,7 +13,7 @@ type PartnerData = {
   partner: { name: string | null; email: string | null; image: string | null; currency: string };
   netWorth: number;
   currentMonth: { income: number; expenses: number; savings: number };
-  accounts: { id: string; name: string; type: string; balance: number; currency: string; color: string; icon: string }[];
+  accounts: { id: string; name: string; type: string; balance: number; reservedAmount: number; currency: string; color: string; icon: string }[];
   recentTransactions: {
     id: string;
     type: string;
@@ -149,7 +149,7 @@ export function PartnerDashboardClient({ coupleLink, partnerData }: { coupleLink
                       {acc.type.replace("_", " ")}
                     </Badge>
                   </div>
-                  <span className="text-sm font-medium">{currencyFormatter(acc.currency)(acc.balance)}</span>
+                  <span className="text-sm font-medium">{currencyFormatter(acc.currency)(acc.balance - (acc.reservedAmount || 0))}</span>
                 </div>
               ))
             )}

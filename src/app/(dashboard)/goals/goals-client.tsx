@@ -57,6 +57,7 @@ interface Account {
   type: string;
   currency: string;
   balance: number;
+  reservedAmount: number;
 }
 
 function getGoalIcon(type: string) {
