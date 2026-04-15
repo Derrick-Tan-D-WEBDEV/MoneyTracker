@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getViewUserId } from "@/lib/partner-view";
+import { getEncryptionKey, encrypt, decrypt } from "@/lib/encryption";
 
 const transactionSchema = z.object({
   accountId: z.string().uuid(),
@@ -19,6 +20,7 @@ const transactionSchema = z.object({
 
 export async function getTransactions(filters?: { type?: string; accountId?: string; categoryId?: string; startDate?: string; endDate?: string }) {
   const userId = await getViewUserId();
+  const encKey = await getEncryptionKey();
 
   const where: Record<string, unknown> = { userId, isRecurring: false, isAdjustment: false };
 
@@ -47,19 +49,20 @@ export async function getTransactions(filters?: { type?: string; accountId?: str
     id: t.id,
     type: t.type,
     amount: Number(t.amount),
-    description: t.description,
+    description: decrypt(t.description, encKey),
     date: t.date.toISOString(),
-    notes: t.notes,
+    notes: t.notes ? decrypt(t.notes, encKey) : t.notes,
     transferId: t.transferId,
     category: t.category ? { id: t.category.id, name: t.category.name, color: t.category.color, icon: t.category.icon } : null,
-    account: { id: t.account.id, name: t.account.name, type: t.account.type, currency: t.account.currency },
-    tags: t.tags.map((tag) => ({ id: tag.id, name: tag.name, color: tag.color })),
+    account: { id: t.account.id, name: decrypt(t.account.name, encKey), type: t.account.type, currency: t.account.currency },
+    tags: t.tags.map((tag) => ({ id: tag.id, name: decrypt(tag.name, encKey), color: tag.color })),
   }));
 }
 
 export async function createTransaction(data: z.input<typeof transactionSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const parsed = transactionSchema.parse(data);
 
@@ -86,9 +89,9 @@ export async function createTransaction(data: z.input<typeof transactionSchema>)
         accountId: parsed.accountId,
         type: "TRANSFER",
         amount: parsed.amount,
-        description: parsed.description || `Transfer to ${toAccount.name}`,
+        description: encrypt(parsed.description || `Transfer to ${decrypt(toAccount.name, encKey)}`, encKey),
         date: parsed.date,
-        notes: parsed.notes || null,
+        notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
         transferId,
       },
     });
@@ -100,9 +103,9 @@ export async function createTransaction(data: z.input<typeof transactionSchema>)
         accountId: parsed.transferToAccountId,
         type: "TRANSFER",
         amount: parsed.amount,
-        description: parsed.description || `Transfer from ${account.name}`,
+        description: encrypt(parsed.description || `Transfer from ${decrypt(account.name, encKey)}`, encKey),
         date: parsed.date,
-        notes: parsed.notes || null,
+        notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
         transferId,
       },
     });
@@ -127,6 +130,8 @@ export async function createTransaction(data: z.input<typeof transactionSchema>)
   const transaction = await db.transaction.create({
     data: {
       ...transactionData,
+      description: encrypt(transactionData.description, encKey),
+      notes: transactionData.notes ? encrypt(transactionData.notes, encKey) : null,
       userId: session.user.id,
       categoryId: transactionData.categoryId || null,
     },
@@ -179,6 +184,7 @@ export async function checkTransactionAchievements(meta?: { type?: string; amoun
 export async function updateTransaction(id: string, data: z.input<typeof transactionSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const existing = await db.transaction.findFirst({
     where: { id, userId: session.user.id },
@@ -205,6 +211,8 @@ export async function updateTransaction(id: string, data: z.input<typeof transac
     where: { id },
     data: {
       ...parsed,
+      description: encrypt(parsed.description, encKey),
+      notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
       categoryId: parsed.categoryId || null,
     },
   });
@@ -274,6 +282,7 @@ const importRowSchema = z.object({
 export async function importTransactions(rows: z.input<typeof importRowSchema>[]) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   if (rows.length === 0) throw new Error("No rows to import");
   if (rows.length > 500) throw new Error("Maximum 500 transactions per import");
@@ -312,9 +321,9 @@ export async function importTransactions(rows: z.input<typeof importRowSchema>[]
           categoryId,
           type: parsed.type,
           amount: parsed.amount,
-          description: parsed.description,
+          description: encrypt(parsed.description, encKey),
           date: new Date(parsed.date),
-          notes: parsed.notes || null,
+          notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
         },
       });
 

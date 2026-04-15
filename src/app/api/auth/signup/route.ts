@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { generateSalt } from "@/lib/encryption";
 
 const signupSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -23,12 +24,15 @@ export async function POST(req: Request) {
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
+    const encryptionSalt = generateSalt();
 
     const user = await db.user.create({
       data: {
         name,
         email,
         password: hashedPassword,
+        encryptionSalt,
+        isDataEncrypted: true, // New user starts encrypted (no existing data to migrate)
       },
     });
 

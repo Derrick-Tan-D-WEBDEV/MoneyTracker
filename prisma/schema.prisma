@@ -10,20 +10,22 @@ datasource db {
 // ─── Auth.js Required Models ───────────────────────────────────────
 
 model User {
-  id             String    @id @default(uuid()) @db.Uuid
-  name           String?
-  email          String    @unique
-  emailVerified  DateTime?
-  image          String?
-  password       String?
-  currency       String    @default("USD")
-  dateFormat     String    @default("MM/DD/YYYY")
-  xp             Int       @default(0)
-  level          Int       @default(1)
-  streak         Int       @default(0)
-  lastActiveDate DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id              String    @id @default(uuid()) @db.Uuid
+  name            String?
+  email           String    @unique
+  emailVerified   DateTime?
+  image           String?
+  password        String?
+  currency        String    @default("USD")
+  dateFormat      String    @default("MM/DD/YYYY")
+  xp              Int       @default(0)
+  level           Int       @default(1)
+  streak          Int       @default(0)
+  lastActiveDate  DateTime?
+  encryptionSalt  String?   // Per-user PBKDF2 salt for field-level encryption
+  isDataEncrypted Boolean   @default(false) // Whether existing data has been encrypted
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   accounts          Account[]
   sessions          Session[]

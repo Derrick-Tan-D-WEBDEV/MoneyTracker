@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+import { generateSalt, deriveKey, encryptExistingData } from "@/lib/encryption";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
@@ -30,6 +31,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const user = await db.user.findUnique({
           where: { email: credentials.email as string },
+          select: { id: true, email: true, name: true, image: true, password: true, encryptionSalt: true, isDataEncrypted: true },
         });
 
         if (!user || !user.password) {
@@ -42,11 +44,34 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
+        // Derive encryption key from password
+        let salt = user.encryptionSalt;
+        if (!salt) {
+          // First login after encryption feature: generate salt
+          salt = generateSalt();
+          await db.user.update({
+            where: { id: user.id },
+            data: { encryptionSalt: salt },
+          });
+        }
+
+        const encryptionKey = deriveKey(credentials.password as string, salt);
+
+        // Lazy-encrypt existing plaintext data on first login
+        if (!user.isDataEncrypted) {
+          try {
+            await encryptExistingData(user.id, encryptionKey);
+          } catch {
+            // Non-blocking: data stays plaintext until next login
+          }
+        }
+
         return {
           id: user.id,
           email: user.email,
           name: user.name,
           image: user.image,
+          encryptionKey,
         };
       },
     }),
@@ -55,6 +80,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
+        // Store encryption key in JWT (server-side only, not exposed to client)
+        if ("encryptionKey" in user) {
+          token.encryptionKey = (user as Record<string, unknown>).encryptionKey;
+        }
       }
       // On sign-in, unlock the "Welcome Aboard" achievement
       if (token.id && trigger === "signIn") {

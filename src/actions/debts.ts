@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getViewUserId } from "@/lib/partner-view";
+import { getEncryptionKey, encrypt, decrypt } from "@/lib/encryption";
 
 const debtSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -35,6 +36,7 @@ const paymentSchema = z.object({
 
 export async function getDebts() {
   const userId = await getViewUserId();
+  const encKey = await getEncryptionKey();
 
   const debts = await db.debt.findMany({
     where: { userId },
@@ -44,11 +46,11 @@ export async function getDebts() {
 
   return debts.map((d) => ({
     id: d.id,
-    name: d.name,
+    name: decrypt(d.name, encKey),
     type: d.type,
-    lender: d.lender,
+    lender: d.lender ? decrypt(d.lender, encKey) : d.lender,
     accountId: d.accountId,
-    accountName: d.account?.name || null,
+    accountName: d.account ? decrypt(d.account.name, encKey) : null,
     accountColor: d.account?.color || null,
     accountRepaymentDay: d.account?.repaymentDay || null,
     accountCreditLimit: d.account?.creditLimit ? Number(d.account.creditLimit) : null,
@@ -63,7 +65,7 @@ export async function getDebts() {
     icon: d.icon,
     color: d.color,
     isPaidOff: d.isPaidOff,
-    notes: d.notes,
+    notes: d.notes ? decrypt(d.notes, encKey) : d.notes,
     createdAt: d.createdAt.toISOString(),
   }));
 }
@@ -71,12 +73,16 @@ export async function getDebts() {
 export async function createDebt(data: z.input<typeof debtSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const parsed = debtSchema.parse(data);
 
   const debt = await db.debt.create({
     data: {
       ...parsed,
+      name: encrypt(parsed.name, encKey),
+      lender: parsed.lender ? encrypt(parsed.lender, encKey) : parsed.lender,
+      notes: parsed.notes ? encrypt(parsed.notes, encKey) : parsed.notes,
       userId: session.user.id,
     },
   });
@@ -93,6 +99,7 @@ export async function createDebt(data: z.input<typeof debtSchema>) {
 export async function updateDebt(id: string, data: z.input<typeof debtSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const existing = await db.debt.findFirst({
     where: { id, userId: session.user.id },
@@ -103,7 +110,12 @@ export async function updateDebt(id: string, data: z.input<typeof debtSchema>) {
 
   await db.debt.update({
     where: { id },
-    data: parsed,
+    data: {
+      ...parsed,
+      name: encrypt(parsed.name, encKey),
+      lender: parsed.lender ? encrypt(parsed.lender, encKey) : parsed.lender,
+      notes: parsed.notes ? encrypt(parsed.notes, encKey) : parsed.notes,
+    },
   });
 
   revalidatePath("/debts");

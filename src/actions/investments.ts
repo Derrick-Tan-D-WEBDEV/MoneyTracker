@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getViewUserId } from "@/lib/partner-view";
+import { getEncryptionKey, encrypt, decrypt } from "@/lib/encryption";
 
 const investmentSchema = z.object({
   accountId: z.string().uuid().optional().nullable(),
@@ -21,6 +22,7 @@ const investmentSchema = z.object({
 
 export async function getInvestments() {
   const userId = await getViewUserId();
+  const encKey = await getEncryptionKey();
 
   const investments = await db.investment.findMany({
     where: { userId },
@@ -30,8 +32,8 @@ export async function getInvestments() {
 
   return investments.map((inv) => ({
     id: inv.id,
-    symbol: inv.symbol,
-    name: inv.name,
+    symbol: inv.symbol ? decrypt(inv.symbol, encKey) : inv.symbol,
+    name: decrypt(inv.name, encKey),
     type: inv.type,
     quantity: Number(inv.quantity),
     buyPrice: Number(inv.buyPrice),
@@ -42,14 +44,15 @@ export async function getInvestments() {
     pnlPercentage: Number(inv.buyPrice) > 0 ? ((Number(inv.currentPrice) - Number(inv.buyPrice)) / Number(inv.buyPrice)) * 100 : 0,
     currency: inv.currency,
     buyDate: inv.buyDate.toISOString(),
-    notes: inv.notes,
-    account: inv.account ? { id: inv.account.id, name: inv.account.name } : null,
+    notes: inv.notes ? decrypt(inv.notes, encKey) : inv.notes,
+    account: inv.account ? { id: inv.account.id, name: decrypt(inv.account.name, encKey) } : null,
   }));
 }
 
 export async function createInvestment(data: z.input<typeof investmentSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const parsed = investmentSchema.parse(data);
 
@@ -58,8 +61,9 @@ export async function createInvestment(data: z.input<typeof investmentSchema>) {
       ...parsed,
       userId: session.user.id,
       accountId: parsed.accountId || null,
-      symbol: parsed.symbol || null,
-      notes: parsed.notes || null,
+      symbol: parsed.symbol ? encrypt(parsed.symbol, encKey) : null,
+      name: encrypt(parsed.name, encKey),
+      notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
     },
   });
 
@@ -76,6 +80,7 @@ export async function checkInvestmentAchievements() {
 export async function updateInvestment(id: string, data: z.input<typeof investmentSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const existing = await db.investment.findFirst({
     where: { id, userId: session.user.id },
@@ -89,8 +94,9 @@ export async function updateInvestment(id: string, data: z.input<typeof investme
     data: {
       ...parsed,
       accountId: parsed.accountId || null,
-      symbol: parsed.symbol || null,
-      notes: parsed.notes || null,
+      symbol: parsed.symbol ? encrypt(parsed.symbol, encKey) : null,
+      name: encrypt(parsed.name, encKey),
+      notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
     },
   });
 

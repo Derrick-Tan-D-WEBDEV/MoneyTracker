@@ -40,7 +40,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       }
     }
     load();
-  }, [updateSession]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleAchievement = useCallback((key: string) => {
     setAchievementKey(key);

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getViewUserId } from "@/lib/partner-view";
+import { getEncryptionKey, encrypt, decrypt } from "@/lib/encryption";
 
 const installmentSchema = z.object({
   accountId: z.string().uuid(),
@@ -27,6 +28,7 @@ const paymentSchema = z.object({
 
 export async function getInstallments() {
   const userId = await getViewUserId();
+  const encKey = await getEncryptionKey();
 
   const installments = await db.installment.findMany({
     where: { userId },
@@ -36,9 +38,9 @@ export async function getInstallments() {
 
   return installments.map((i) => ({
     id: i.id,
-    name: i.name,
+    name: decrypt(i.name, encKey),
     type: i.type,
-    merchant: i.merchant,
+    merchant: i.merchant ? decrypt(i.merchant, encKey) : i.merchant,
     totalAmount: Number(i.totalAmount),
     monthlyPayment: Number(i.monthlyPayment),
     totalMonths: i.totalMonths,
@@ -50,8 +52,8 @@ export async function getInstallments() {
     startDate: i.startDate.toISOString(),
     currency: i.currency,
     isCompleted: i.isCompleted,
-    notes: i.notes,
-    account: i.account,
+    notes: i.notes ? decrypt(i.notes, encKey) : i.notes,
+    account: i.account ? { ...i.account, name: decrypt(i.account.name, encKey) } : i.account,
     createdAt: i.createdAt.toISOString(),
   }));
 }
@@ -59,6 +61,7 @@ export async function getInstallments() {
 export async function createInstallment(data: z.input<typeof installmentSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const parsed = installmentSchema.parse(data);
 
@@ -76,9 +79,9 @@ export async function createInstallment(data: z.input<typeof installmentSchema>)
     data: {
       userId: session.user.id,
       accountId: parsed.accountId,
-      name: parsed.name,
+      name: encrypt(parsed.name, encKey),
       type: parsed.type,
-      merchant: parsed.merchant || null,
+      merchant: parsed.merchant ? encrypt(parsed.merchant, encKey) : null,
       totalAmount: parsed.totalAmount,
       monthlyPayment,
       totalMonths: parsed.totalMonths,
@@ -87,7 +90,7 @@ export async function createInstallment(data: z.input<typeof installmentSchema>)
       interestRate: parsed.interestRate,
       startDate: parsed.startDate,
       currency: parsed.currency,
-      notes: parsed.notes || null,
+      notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
     },
   });
 
@@ -127,6 +130,7 @@ export async function makeInstallmentPayment(data: z.input<typeof paymentSchema>
 export async function updateInstallment(id: string, data: z.input<typeof installmentSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const encKey = await getEncryptionKey();
 
   const existing = await db.installment.findFirst({
     where: { id, userId: session.user.id },
@@ -142,9 +146,9 @@ export async function updateInstallment(id: string, data: z.input<typeof install
     where: { id },
     data: {
       accountId: parsed.accountId,
-      name: parsed.name,
+      name: encrypt(parsed.name, encKey),
       type: parsed.type,
-      merchant: parsed.merchant || null,
+      merchant: parsed.merchant ? encrypt(parsed.merchant, encKey) : null,
       totalAmount: parsed.totalAmount,
       monthlyPayment,
       totalMonths: parsed.totalMonths,
@@ -153,7 +157,7 @@ export async function updateInstallment(id: string, data: z.input<typeof install
       interestRate: parsed.interestRate,
       startDate: parsed.startDate,
       currency: parsed.currency,
-      notes: parsed.notes || null,
+      notes: parsed.notes ? encrypt(parsed.notes, encKey) : null,
     },
   });
 
