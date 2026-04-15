@@ -295,10 +295,11 @@ const importRowSchema = z.object({
   categoryName: z.string().optional().nullable(),
 });
 
-export async function importTransactions(rows: z.input<typeof importRowSchema>[]) {
+export async function importTransactions(rows: z.input<typeof importRowSchema>[], options?: { adjustBalance?: boolean }) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
   const encKey = await getEncryptionKey();
+  const adjustBalance = options?.adjustBalance ?? true;
 
   if (rows.length === 0) throw new Error("No rows to import");
   if (rows.length > 500) throw new Error("Maximum 500 transactions per import");
@@ -352,13 +353,15 @@ export async function importTransactions(rows: z.input<typeof importRowSchema>[]
   }
 
   // Batch update account balances
-  for (const [accountId, change] of balanceChanges) {
-    const acct = await db.financialAccount.findUnique({ where: { id: accountId } });
-    const currentBalance = decryptAmount(acct!.balance, encKey);
-    await db.financialAccount.update({
-      where: { id: accountId },
-      data: { balance: encryptAmount(currentBalance + change, encKey) },
-    });
+  if (adjustBalance) {
+    for (const [accountId, change] of balanceChanges) {
+      const acct = await db.financialAccount.findUnique({ where: { id: accountId } });
+      const currentBalance = decryptAmount(acct!.balance, encKey);
+      await db.financialAccount.update({
+        where: { id: accountId },
+        data: { balance: encryptAmount(currentBalance + change, encKey) },
+      });
+    }
   }
 
   revalidatePath("/");

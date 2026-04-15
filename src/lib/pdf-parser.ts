@@ -12,6 +12,7 @@ export interface ParsedTransaction {
   amount: number;
   type: "INCOME" | "EXPENSE";
   notes: string | null;
+  statementBalance: number | null;
 }
 
 // ─── Text Extraction ──────────────────────────────────────────
@@ -211,8 +212,10 @@ function parseDBS(allText: string): ParsedTransaction[] {
       // the last one is the balance. The first is the actual amount.
       // If there are 3 amounts: withdrawal, deposit, balance — pick the non-balance.
       let amount: number;
+      let statementBalance: number | null = null;
       if (currentAmounts.length >= 2) {
         amount = currentAmounts[0]; // First amount is the transaction amount
+        statementBalance = currentAmounts[currentAmounts.length - 1]; // Last is balance
       } else {
         amount = currentAmounts[0];
       }
@@ -224,6 +227,7 @@ function parseDBS(allText: string): ParsedTransaction[] {
           amount,
           type: isDeposit ? "INCOME" : "EXPENSE",
           notes,
+          statementBalance,
         });
       }
     }
@@ -313,6 +317,7 @@ function parseGeneric(allText: string): ParsedTransaction[] {
 
       // Use first amount (skip balance if multiple)
       const amount = currentAmounts[0];
+      const statementBalance = currentAmounts.length >= 2 ? currentAmounts[currentAmounts.length - 1] : null;
       if (amount > 0) {
         transactions.push({
           date: currentDate,
@@ -320,6 +325,7 @@ function parseGeneric(allText: string): ParsedTransaction[] {
           amount,
           type: "EXPENSE", // Default, will be refined after
           notes,
+          statementBalance,
         });
       }
     }

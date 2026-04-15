@@ -43,6 +43,7 @@ interface ReviewRow {
   categoryName: string | null;
   notes: string | null;
   isDuplicate?: boolean;
+  statementBalance?: number | null;
 }
 
 interface CSVImportDialogProps {
@@ -90,6 +91,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{ imported: number; skipped: number; total: number } | null>(null);
   const [reviewRows, setReviewRows] = useState<ReviewRow[]>([]);
+  const [adjustBalance, setAdjustBalance] = useState(false);
 
   const reset = () => {
     setStep("upload");
@@ -104,6 +106,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
     setImporting(false);
     setResult(null);
     setReviewRows([]);
+    setAdjustBalance(false);
   };
 
   const handleClose = (open: boolean) => {
@@ -141,6 +144,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
             amount: tx.amount,
             categoryName: null,
             notes: tx.notes,
+            statementBalance: tx.statementBalance,
           }));
           const acctId = defaultAccountId || accountId;
           if (acctId) {
@@ -304,7 +308,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
         accountId,
       }));
 
-      const res = await importTransactions(rows);
+      const res = await importTransactions(rows, { adjustBalance });
       setResult(res);
 
       if (res.imported > 0) {
@@ -468,6 +472,20 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
             const expenseCount = selected.filter((r) => r.type === "EXPENSE").length;
             const allSelected = reviewRows.length > 0 && reviewRows.every((r) => r.selected);
             const duplicateCount = reviewRows.filter((r) => r.isDuplicate).length;
+            const hasStatementBalance = reviewRows.some((r) => r.statementBalance != null);
+            const currentAccount = accounts.find((a) => a.id === accountId);
+            const startingBalance = currentAccount?.balance ?? 0;
+
+            // Compute running balance for selected rows
+            const runningBalances = new Map<number, number>();
+            let bal = startingBalance;
+            for (const row of reviewRows) {
+              if (row.selected) {
+                bal += row.type === "INCOME" ? row.amount : -row.amount;
+              }
+              runningBalances.set(row.id, bal);
+            }
+            const finalBalance = bal;
 
             return (
               <div className="space-y-4">
@@ -489,7 +507,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                   </div>
                 )}
 
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                   <div className="bg-muted/50 rounded-lg p-3 text-center">
                     <p className="text-2xl font-bold">{selected.length}</p>
                     <p className="text-xs text-muted-foreground">Selected</p>
@@ -506,6 +524,14 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                     <p className="text-2xl font-bold text-red-500">{expenseCount}</p>
                     <p className="text-xs text-muted-foreground">Expenses</p>
                   </div>
+                  <div className="bg-muted/50 rounded-lg p-3 text-center">
+                    <p className="text-lg font-bold tabular-nums">{startingBalance.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">Current Bal</p>
+                  </div>
+                  <div className={`rounded-lg p-3 text-center ${adjustBalance ? (finalBalance >= startingBalance ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-red-50 dark:bg-red-950/30") : "bg-muted/50"}`}>
+                    <p className={`text-lg font-bold tabular-nums ${adjustBalance ? (finalBalance >= startingBalance ? "text-emerald-600" : "text-red-500") : ""}`}>{adjustBalance ? finalBalance.toFixed(2) : startingBalance.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">After Import</p>
+                  </div>
                 </div>
 
                 {duplicateCount > 0 && (
@@ -516,6 +542,22 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                     </span>
                   </div>
                 )}
+
+                <div className="flex items-center justify-between bg-muted/50 rounded-lg p-3">
+                  <div>
+                    <p className="text-sm font-medium">Adjust account balance</p>
+                    <p className="text-xs text-muted-foreground">Turn on if your account balance doesn&apos;t reflect these transactions yet</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={adjustBalance}
+                    onClick={() => setAdjustBalance(!adjustBalance)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${adjustBalance ? "bg-emerald-500" : "bg-muted-foreground/30"}`}
+                  >
+                    <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${adjustBalance ? "translate-x-4" : "translate-x-0"}`} />
+                  </button>
+                </div>
 
                 <div className="border rounded-lg overflow-auto max-h-[400px]">
                   <Table>
@@ -528,6 +570,8 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                         <TableHead>Description</TableHead>
                         <TableHead className="w-[90px]">Type</TableHead>
                         <TableHead className="w-[100px] text-right">Amount</TableHead>
+                        {hasStatementBalance && <TableHead className="w-[110px] text-right">Stmt Bal</TableHead>}
+                        <TableHead className="w-[110px] text-right">Balance</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -567,6 +611,14 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                               onChange={(e) => updateRow(row.id, "amount", Math.abs(parseFloat(e.target.value) || 0))}
                               className="h-7 text-sm text-right tabular-nums w-[90px] ml-auto"
                             />
+                          </TableCell>
+                          {hasStatementBalance && (
+                            <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
+                              {row.statementBalance != null ? row.statementBalance.toFixed(2) : "—"}
+                            </TableCell>
+                          )}
+                          <TableCell className={`text-right text-sm tabular-nums font-medium ${(runningBalances.get(row.id) ?? 0) < 0 ? "text-red-500" : "text-muted-foreground"}`}>
+                            {(runningBalances.get(row.id) ?? 0).toFixed(2)}
                           </TableCell>
                         </TableRow>
                       ))}
