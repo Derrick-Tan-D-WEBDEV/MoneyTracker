@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
 import { getViewUser } from "@/lib/partner-view";
-import { getEncryptionKey, decryptAmount } from "@/lib/encryption";
+import { getEncryptionKey, decryptAmount, decrypt } from "@/lib/encryption";
 
 export interface MonthlyProgress {
   // Debts
@@ -103,7 +103,7 @@ export async function getMonthlyProgress(): Promise<MonthlyProgress> {
   for (const d of debts) {
     if (d.dueDay && d.dueDay >= today) {
       upcomingBills.push({
-        name: d.name,
+        name: decrypt(d.name, encKey),
         amount: convertCurrency(decryptAmount(d.minimumPayment, encKey), d.currency, userCurrency, rates),
         dueDay: d.dueDay,
         type: "debt",
@@ -116,7 +116,7 @@ export async function getMonthlyProgress(): Promise<MonthlyProgress> {
     const startDay = i.startDate.getDate();
     if (startDay >= today) {
       upcomingBills.push({
-        name: i.name,
+        name: decrypt(i.name, encKey),
         amount: convertCurrency(decryptAmount(i.monthlyPayment, encKey), i.currency, userCurrency, rates),
         dueDay: startDay,
         type: "installment",

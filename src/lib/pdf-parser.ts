@@ -364,6 +364,178 @@ function parseDBS(allText: string): ParsedTransaction[] {
   return transactions;
 }
 
+// ─── OCBC-specific Parser ─────────────────────────────────────
+
+/** OCBC uses dual dates per transaction: Transaction Date + Value Date (DD MMM DD MMM). */
+const OCBC_DUAL_DATE = /^(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i;
+
+/** Parse an OCBC dual-date line and return the transaction date + remaining text. */
+function parseOCBCDateLine(line: string, year: number): { date: string; rest: string } | null {
+  const m = line.match(OCBC_DUAL_DATE);
+  if (!m) return null;
+  const day = m[1].padStart(2, "0");
+  const month = MONTHS[m[2].toLowerCase().slice(0, 3)] || "01";
+  const rest = line.replace(OCBC_DUAL_DATE, "").trim();
+  return { date: `${year}-${month}-${day}`, rest };
+}
+
+/** Extract clean description from OCBC multi-line transaction detail. */
+function cleanOCBCDescription(lines: string[]): { description: string; notes: string | null } {
+  if (lines.length === 0) return { description: "Unknown transaction", notes: null };
+
+  const txType = lines[0]; // e.g. "FAST PAYMENT", "NETS QR", "BONUS INTEREST"
+
+  // Look for "to Name" or "from Name" (OCBC style — no colon)
+  for (const line of lines) {
+    const toMatch = line.match(/^to\s+(.+)/i);
+    if (toMatch) {
+      return { description: toMatch[1].trim(), notes: txType };
+    }
+    const fromMatch = line.match(/^from\s+(.+)/i);
+    if (fromMatch) {
+      return { description: fromMatch[1].trim(), notes: txType };
+    }
+  }
+
+  // NETS QR: merchant name is the last non-reference, non-"NETS QR" line
+  if (/NETS QR/i.test(txType) && lines.length >= 3) {
+    for (let i = lines.length - 1; i >= 1; i--) {
+      if (!/^\d+$/.test(lines[i]) && !/NETS QR/i.test(lines[i])) {
+        return { description: lines[i], notes: txType };
+      }
+    }
+  }
+
+  // Filter noise from notes: OTHR- refs, reference numbers, via PayNow
+  const noteLines = lines
+    .slice(1)
+    .filter((l) => !/^OTHR[-\s]/i.test(l) && !/^\d{5,}$/.test(l) && !/^via PayNow/i.test(l));
+
+  return {
+    description: txType,
+    notes: noteLines.length > 0 ? noteLines.join("; ").slice(0, 200) : null,
+  };
+}
+
+/**
+ * Parse OCBC bank statement.
+ * Processes pages individually to avoid noise from non-transaction pages (e.g. transaction code reference).
+ * Uses balance-diff method for accurate INCOME/EXPENSE detection.
+ */
+function parseOCBC(pages: string[]): ParsedTransaction[] {
+  const allText = pages.join("\n");
+  const statementYear = extractStatementYear(allText);
+  const transactions: ParsedTransaction[] = [];
+  let previousBalance: number | null = null;
+
+  for (const pageText of pages) {
+    const lines = pageText.split("\n");
+
+    // Only process pages that contain actual transactions or opening balance
+    const hasTransactions = lines.some((l) => OCBC_DUAL_DATE.test(l));
+    const hasOpeningBalance = lines.some((l) => /balance b\/f/i.test(l));
+    if (!hasTransactions && !hasOpeningBalance) continue;
+
+    let currentDate: string | null = null;
+    let lastDate: string | null = null;
+    let currentDescLines: string[] = [];
+    let currentAmounts: number[] = [];
+
+    const flushTransaction = () => {
+      if (currentDate && currentAmounts.length > 0) {
+        const { description, notes } = cleanOCBCDescription(currentDescLines);
+
+        let amount: number;
+        let statementBalance: number | null = null;
+        let type: "INCOME" | "EXPENSE" = "EXPENSE";
+
+        // Last amount is balance; use balance-diff for type detection
+        if (currentAmounts.length >= 2) {
+          statementBalance = currentAmounts[currentAmounts.length - 1];
+
+          if (previousBalance !== null) {
+            const diff = statementBalance - previousBalance;
+            type = diff >= 0 ? "INCOME" : "EXPENSE";
+            amount = Math.round(Math.abs(diff) * 100) / 100;
+          } else {
+            amount = currentAmounts[0];
+          }
+
+          previousBalance = statementBalance;
+        } else {
+          amount = currentAmounts[0];
+        }
+
+        if (amount > 0) {
+          transactions.push({ date: currentDate, description, amount, type, notes, statementBalance });
+        }
+      }
+      lastDate = currentDate || lastDate;
+      currentDate = null;
+      currentDescLines = [];
+      currentAmounts = [];
+    };
+
+    for (const line of lines) {
+      // Opening balance
+      if (/balance b\/f/i.test(line)) {
+        const amounts = extractAmounts(line);
+        if (amounts.length > 0) previousBalance = amounts[amounts.length - 1];
+        continue;
+      }
+
+      // Closing balance — skip
+      if (/balance c\/f/i.test(line)) continue;
+
+      // Skip noise lines
+      if (isNoiseLine(line)) continue;
+
+      const parsed = parseOCBCDateLine(line, statementYear);
+      if (parsed) {
+        flushTransaction();
+        currentDate = parsed.date;
+
+        const amounts = extractAmounts(parsed.rest);
+        if (amounts.length > 0) currentAmounts = amounts;
+
+        const descPart = parsed.rest.replace(AMOUNT_RE, "").trim();
+        if (descPart) currentDescLines.push(descPart);
+      } else if (currentDate || lastDate) {
+        const amounts = extractAmounts(line);
+        const textWithoutAmounts = line.replace(AMOUNT_RE, "").trim();
+
+        // New transaction on same date (has both amount + balance while current already has them)
+        if (amounts.length >= 2 && currentAmounts.length >= 2) {
+          flushTransaction();
+          currentDate = lastDate;
+          currentAmounts = amounts;
+          if (textWithoutAmounts && !isNoiseLine(textWithoutAmounts)) {
+            currentDescLines.push(textWithoutAmounts);
+          }
+        } else if (amounts.length > 0 && currentAmounts.length === 0) {
+          if (!currentDate) currentDate = lastDate;
+          currentAmounts = amounts;
+          if (textWithoutAmounts && !isNoiseLine(textWithoutAmounts)) {
+            currentDescLines.push(textWithoutAmounts);
+          }
+        } else if (amounts.length > 0) {
+          currentAmounts.push(...amounts);
+          if (textWithoutAmounts && !isNoiseLine(textWithoutAmounts)) {
+            currentDescLines.push(textWithoutAmounts);
+          }
+        } else {
+          if (textWithoutAmounts && !isNoiseLine(textWithoutAmounts)) {
+            currentDescLines.push(textWithoutAmounts);
+          }
+        }
+      }
+    }
+    flushTransaction();
+  }
+
+  return transactions;
+}
+
 // ─── Generic Parser ───────────────────────────────────────────
 
 /**
@@ -455,6 +627,7 @@ export async function parseBankStatementPDF(file: File, bank: BankFormat = "gene
     case "dbs":
       return parseDBS(allText);
     case "ocbc":
+      return parseOCBC(pages);
     case "uob":
     default:
       return parseGeneric(allText);

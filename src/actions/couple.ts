@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
-import { getEncryptionKeyForUser, decryptAmount } from "@/lib/encryption";
+import { getEncryptionKeyForUser, decryptAmount, decrypt } from "@/lib/encryption";
 
 // Generate a short invite code
 function generateInviteCode(): string {
@@ -229,6 +229,7 @@ export async function getPartnerDashboardData() {
     // Partner hasn't logged in since encryption was enabled
   }
   const da = (val: unknown) => (encKey ? decryptAmount(val, encKey) : Number(val) || 0);
+  const ds = (val: string) => (encKey ? decrypt(val, encKey) : val);
 
   const accountBalance = accounts.reduce((sum, acc) => {
     const bal = da(acc.balance) - da(acc.reservedAmount);
@@ -259,7 +260,7 @@ export async function getPartnerDashboardData() {
     },
     accounts: accounts.map((a) => ({
       id: a.id,
-      name: a.name,
+      name: ds(a.name),
       type: a.type,
       balance: da(a.balance),
       reservedAmount: da(a.reservedAmount),
@@ -271,15 +272,15 @@ export async function getPartnerDashboardData() {
       id: t.id,
       type: t.type,
       amount: da(t.amount),
-      description: t.description,
+      description: ds(t.description),
       date: t.date.toISOString(),
       category: t.category?.name || "Uncategorized",
       categoryIcon: t.category?.icon || "tag",
-      accountName: t.account.name,
+      accountName: ds(t.account.name),
     })),
     goals: goals.map((g) => ({
       id: g.id,
-      name: g.name,
+      name: ds(g.name),
       targetAmount: da(g.targetAmount),
       currentAmount: da(g.currentAmount),
       type: g.type,
@@ -288,7 +289,7 @@ export async function getPartnerDashboardData() {
     })),
     debts: debts.map((d) => ({
       id: d.id,
-      name: d.name,
+      name: ds(d.name),
       type: d.type,
       originalAmount: da(d.originalAmount),
       remainingAmount: da(d.remainingAmount),
