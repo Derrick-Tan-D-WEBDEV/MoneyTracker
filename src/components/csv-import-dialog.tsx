@@ -552,7 +552,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
 
             return (
               <div className="space-y-4">
-                {fileType === "pdf" && !defaultAccountId && (
+                {!defaultAccountId && !accountId && (
                   <div className="space-y-2">
                     <Label>Target Account *</Label>
                     <Select value={accountId} onValueChange={(v) => v && setAccountId(v)}>
