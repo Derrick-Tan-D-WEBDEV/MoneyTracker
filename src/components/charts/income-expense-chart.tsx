@@ -25,7 +25,8 @@ export function IncomeExpenseChart({ data, onMonthClick }: { data: MonthlyData[]
           }
         }}
         onMouseMove={(state) => {
-          setActiveIndex(state?.activeTooltipIndex ?? null);
+          const idx = state?.activeTooltipIndex;
+          setActiveIndex(typeof idx === "number" ? idx : null);
         }}
         onMouseLeave={() => setActiveIndex(null)}
         style={{ cursor: onMonthClick ? "pointer" : undefined }}
