@@ -72,6 +72,9 @@ export async function getDashboardData() {
     include: { category: true, account: true },
   });
 
+  // Also include generated recurring transactions (isRecurring: false, created by processRecurringTransactions)
+  // Template transactions (isRecurring: true) are excluded — they're blueprints, not real transactions
+
   // Last month transactions
   const lastMonthTransactions = await db.transaction.findMany({
     where: {

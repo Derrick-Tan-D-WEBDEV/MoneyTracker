@@ -100,38 +100,43 @@ export async function processRecurringTransactions() {
 
   for (const rule of dueRules) {
     const t = rule.transaction;
+    let currentDue = rule.nextDue;
 
-    // Create a new transaction based on the template
-    await db.transaction.create({
-      data: {
-        userId: t.userId,
-        accountId: t.accountId,
-        categoryId: t.categoryId,
-        type: t.type,
-        amount: t.amount,
-        description: t.description,
-        date: rule.nextDue,
-        notes: t.notes,
-      },
-    });
+    // Catch up all missed dates (e.g. user didn't log in for a while)
+    while (currentDue <= now) {
+      // Create a new transaction based on the template
+      await db.transaction.create({
+        data: {
+          userId: t.userId,
+          accountId: t.accountId,
+          categoryId: t.categoryId,
+          type: t.type,
+          amount: t.amount,
+          description: t.description,
+          date: currentDue,
+          notes: t.notes,
+        },
+      });
 
-    // Update account balance
-    const txAmount = decryptAmount(t.amount, encKey);
-    const balanceChange = t.type === "INCOME" ? txAmount : -txAmount;
-    const acct = await db.financialAccount.findUnique({ where: { id: t.accountId } });
-    const currentBalance = decryptAmount(acct!.balance, encKey);
-    await db.financialAccount.update({
-      where: { id: t.accountId },
-      data: { balance: encryptAmount(currentBalance + balanceChange, encKey) },
-    });
+      // Update account balance
+      const txAmount = decryptAmount(t.amount, encKey);
+      const balanceChange = t.type === "INCOME" ? txAmount : -txAmount;
+      const acct = await db.financialAccount.findUnique({ where: { id: t.accountId } });
+      const currentBalance = decryptAmount(acct!.balance, encKey);
+      await db.financialAccount.update({
+        where: { id: t.accountId },
+        data: { balance: encryptAmount(currentBalance + balanceChange, encKey) },
+      });
 
-    // Advance the next due date
+      created++;
+      currentDue = getNextDueDate(currentDue, rule.frequency);
+    }
+
+    // Set nextDue to the next future date
     await db.recurringRule.update({
       where: { id: rule.id },
-      data: { nextDue: getNextDueDate(rule.nextDue, rule.frequency) },
+      data: { nextDue: currentDue },
     });
-
-    created++;
   }
 
   if (created > 0) {
