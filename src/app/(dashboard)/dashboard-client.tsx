@@ -798,15 +798,11 @@ export function DashboardClient({ data }: { data: DashboardData | null }) {
             <>
               <div className="grid grid-cols-3 gap-3 mb-4">
                 <div className="bg-muted/50 rounded-lg p-3 text-center">
-                  <p className="text-lg font-bold text-emerald-600 tabular-nums">
-                    {formatCurrency(breakdownTxns.filter((t) => t.type === "INCOME").reduce((s, t) => s + t.convertedAmount, 0))}
-                  </p>
+                  <p className="text-lg font-bold text-emerald-600 tabular-nums">{formatCurrency(breakdownTxns.filter((t) => t.type === "INCOME").reduce((s, t) => s + t.convertedAmount, 0))}</p>
                   <p className="text-xs text-muted-foreground">Income</p>
                 </div>
                 <div className="bg-muted/50 rounded-lg p-3 text-center">
-                  <p className="text-lg font-bold text-red-500 tabular-nums">
-                    {formatCurrency(breakdownTxns.filter((t) => t.type === "EXPENSE").reduce((s, t) => s + t.convertedAmount, 0))}
-                  </p>
+                  <p className="text-lg font-bold text-red-500 tabular-nums">{formatCurrency(breakdownTxns.filter((t) => t.type === "EXPENSE").reduce((s, t) => s + t.convertedAmount, 0))}</p>
                   <p className="text-xs text-muted-foreground">Expenses</p>
                 </div>
                 <div className="bg-muted/50 rounded-lg p-3 text-center">
@@ -834,15 +830,10 @@ export function DashboardClient({ data }: { data: DashboardData | null }) {
                     const CIcon = getCategoryIcon(t.category?.icon || "tag");
                     return (
                       <TableRow key={t.id}>
-                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                          {new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <div
-                              className="w-6 h-6 rounded flex items-center justify-center shrink-0"
-                              style={{ backgroundColor: (t.category?.color || "#6B7280") + "20" }}
-                            >
+                            <div className="w-6 h-6 rounded flex items-center justify-center shrink-0" style={{ backgroundColor: (t.category?.color || "#6B7280") + "20" }}>
                               <CIcon className="w-3 h-3" style={{ color: t.category?.color || "#6B7280" }} />
                             </div>
                             <span className="text-sm font-medium truncate max-w-[200px]">{t.description}</span>
