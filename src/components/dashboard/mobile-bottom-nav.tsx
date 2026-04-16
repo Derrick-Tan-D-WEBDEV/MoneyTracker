@@ -25,6 +25,9 @@ import {
   X,
   Heart,
   Package,
+  PiggyBank,
+  FileText,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -35,30 +38,62 @@ const primaryTabs = [
   { href: "/goals", icon: Flag, label: "Goals" },
 ];
 
-const moreItems = [
-  { href: "/budgets", icon: Target, label: "Budgets" },
-  { href: "/investments", icon: TrendingUp, label: "Investments" },
-  { href: "/assets", icon: Package, label: "Assets" },
-  { href: "/debts", icon: Landmark, label: "Debts" },
-  { href: "/installments", icon: CreditCard, label: "Installments" },
-  { href: "/calendar", icon: CalendarDays, label: "Bill Calendar" },
-  { href: "/recurring", icon: Repeat, label: "Recurring" },
-  { href: "/subscriptions", icon: RefreshCw, label: "Subscriptions" },
-  { href: "/wishlist", icon: ShoppingBag, label: "Wishlist" },
-  { href: "/achievements", icon: Trophy, label: "Achievements" },
-  { href: "/reports", icon: BarChart3, label: "Reports" },
-  { href: "/export", icon: Download, label: "Export" },
-  { href: "/tax", icon: Calculator, label: "Tax" },
-  { href: "/partner", icon: Heart, label: "Partner" },
-  { href: "/settings", icon: Settings, label: "Settings" },
+interface MoreSection {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  items: { href: string; icon: React.ComponentType<{ className?: string }>; label: string }[];
+}
+
+const moreSections: MoreSection[] = [
+  {
+    label: "Planning",
+    icon: PiggyBank,
+    items: [
+      { href: "/budgets", icon: Target, label: "Budgets" },
+      { href: "/recurring", icon: Repeat, label: "Recurring" },
+      { href: "/calendar", icon: CalendarDays, label: "Bill Calendar" },
+      { href: "/subscriptions", icon: RefreshCw, label: "Subscriptions" },
+    ],
+  },
+  {
+    label: "Wealth",
+    icon: TrendingUp,
+    items: [
+      { href: "/investments", icon: TrendingUp, label: "Investments" },
+      { href: "/assets", icon: Package, label: "Assets" },
+      { href: "/debts", icon: Landmark, label: "Debts" },
+      { href: "/installments", icon: CreditCard, label: "Installments" },
+    ],
+  },
+  {
+    label: "Insights",
+    icon: FileText,
+    items: [
+      { href: "/reports", icon: BarChart3, label: "Reports" },
+      { href: "/tax", icon: Calculator, label: "Tax" },
+      { href: "/export", icon: Download, label: "Export" },
+    ],
+  },
+  {
+    label: "Lifestyle",
+    icon: Sparkles,
+    items: [
+      { href: "/wishlist", icon: ShoppingBag, label: "Wishlist" },
+      { href: "/achievements", icon: Trophy, label: "Achievements" },
+      { href: "/partner", icon: Heart, label: "Partner" },
+      { href: "/settings", icon: Settings, label: "Settings" },
+    ],
+  },
 ];
+
+const allMoreItems = moreSections.flatMap((s) => s.items);
 
 export function MobileBottomNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const isMoreActive = moreItems.some((item) => pathname.startsWith(item.href));
+  const isMoreActive = allMoreItems.some((item) => pathname.startsWith(item.href));
 
   return (
     <>
@@ -73,27 +108,35 @@ export function MobileBottomNav() {
                 <X className="w-4 h-4 text-muted-foreground" />
               </button>
             </div>
-            <div className="grid grid-cols-4 gap-2">
-              {moreItems.map((item) => {
-                const isActive = pathname.startsWith(item.href);
-                return (
-                  <button
-                    key={item.href}
-                    onClick={() => {
-                      setMoreOpen(false);
-                      router.push(item.href);
-                    }}
-                    className={cn(
-                      "flex flex-col items-center gap-1 p-3 rounded-xl text-center transition-colors",
-                      isActive ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                    )}
-                  >
-                    <item.icon className="w-5 h-5" />
-                    <span className="text-[10px] leading-tight font-medium">{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+            {moreSections.map((section) => (
+              <div key={section.label} className="mb-3">
+                <div className="flex items-center gap-2 mb-1.5 px-1">
+                  <section.icon className="w-3.5 h-3.5 text-muted-foreground/60" />
+                  <span className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-wider">{section.label}</span>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {section.items.map((item) => {
+                    const isActive = pathname.startsWith(item.href);
+                    return (
+                      <button
+                        key={item.href}
+                        onClick={() => {
+                          setMoreOpen(false);
+                          router.push(item.href);
+                        }}
+                        className={cn(
+                          "flex flex-col items-center gap-1 p-3 rounded-xl text-center transition-colors",
+                          isActive ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                        )}
+                      >
+                        <item.icon className="w-5 h-5" />
+                        <span className="text-[10px] leading-tight font-medium">{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
