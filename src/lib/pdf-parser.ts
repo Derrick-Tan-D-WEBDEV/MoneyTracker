@@ -407,9 +407,7 @@ function cleanOCBCDescription(lines: string[]): { description: string; notes: st
   }
 
   // Filter noise from notes: OTHR- refs, reference numbers, via PayNow
-  const noteLines = lines
-    .slice(1)
-    .filter((l) => !/^OTHR[-\s]/i.test(l) && !/^\d{5,}$/.test(l) && !/^via PayNow/i.test(l));
+  const noteLines = lines.slice(1).filter((l) => !/^OTHR[-\s]/i.test(l) && !/^\d{5,}$/.test(l) && !/^via PayNow/i.test(l));
 
   return {
     description: txType,
