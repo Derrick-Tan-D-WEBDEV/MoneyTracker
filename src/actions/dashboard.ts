@@ -298,3 +298,48 @@ export async function getDashboardData() {
     },
   };
 }
+
+export async function getMonthBreakdown(monthLabel: string) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  const { id: userId, currency: userCurrency } = await getViewUser();
+  const encKey = await getEncryptionKey();
+  const rates = await getExchangeRates(userCurrency);
+  const toUser = (amount: number, fromCurrency: string) => convertCurrency(amount, fromCurrency, userCurrency, rates);
+
+  // Parse month label (e.g. "Mar") to date range
+  const now = new Date();
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthIndex = monthNames.indexOf(monthLabel);
+  if (monthIndex === -1) throw new Error("Invalid month");
+
+  // Determine the year — chart shows last 12 months
+  let year = now.getFullYear();
+  if (monthIndex > now.getMonth()) year--;
+
+  const monthStart = new Date(year, monthIndex, 1);
+  const monthEnd = new Date(year, monthIndex + 1, 0, 23, 59, 59, 999);
+
+  const transactions = await db.transaction.findMany({
+    where: {
+      userId,
+      isRecurring: false,
+      isAdjustment: false,
+      date: { gte: monthStart, lte: monthEnd },
+    },
+    include: { category: true, account: true },
+    orderBy: { date: "desc" },
+  });
+
+  return transactions.map((t) => ({
+    id: t.id,
+    type: t.type,
+    amount: decryptAmount(t.amount, encKey),
+    convertedAmount: toUser(decryptAmount(t.amount, encKey), t.account.currency),
+    description: decrypt(t.description, encKey),
+    date: t.date.toISOString(),
+    category: t.category ? { name: t.category.name, color: t.category.color, icon: t.category.icon } : null,
+    account: { name: decrypt(t.account.name, encKey), currency: t.account.currency },
+  }));
+}

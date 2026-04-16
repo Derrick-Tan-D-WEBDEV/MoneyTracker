@@ -34,6 +34,10 @@ import { AnimatedCounter } from "@/components/dashboard/animated-counter";
 import { currencyFormatter } from "@/lib/format";
 import { getSpendingInsights } from "@/actions/insights";
 import { getMonthlyProgress, type MonthlyProgress } from "@/actions/monthly-progress";
+import { getMonthBreakdown } from "@/actions/dashboard";
+import { getCategoryIcon } from "@/lib/category-icons";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { CalendarClock } from "lucide-react";
@@ -244,8 +248,12 @@ export function DashboardClient({ data }: { data: DashboardData | null }) {
   };
 
   type InsightData = Awaited<ReturnType<typeof getSpendingInsights>>;
+  type BreakdownTx = Awaited<ReturnType<typeof getMonthBreakdown>>[number];
   const [insights, setInsights] = useState<InsightData | null>(null);
   const [monthlyProgress, setMonthlyProgress] = useState<MonthlyProgress | null>(null);
+  const [breakdownMonth, setBreakdownMonth] = useState<string | null>(null);
+  const [breakdownTxns, setBreakdownTxns] = useState<BreakdownTx[]>([]);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
   useEffect(() => {
     if (hasTransactions) {
       getSpendingInsights()
@@ -256,6 +264,19 @@ export function DashboardClient({ data }: { data: DashboardData | null }) {
       .then(setMonthlyProgress)
       .catch(() => {});
   }, [hasTransactions]);
+
+  const handleMonthClick = async (month: string) => {
+    setBreakdownMonth(month);
+    setBreakdownLoading(true);
+    try {
+      const txns = await getMonthBreakdown(month);
+      setBreakdownTxns(txns);
+    } catch {
+      setBreakdownTxns([]);
+    } finally {
+      setBreakdownLoading(false);
+    }
+  };
 
   // Build next steps based on what's missing
   const nextSteps = [];
@@ -526,7 +547,7 @@ export function DashboardClient({ data }: { data: DashboardData | null }) {
             </Badge>
           </CardHeader>
           <CardContent>
-            <IncomeExpenseChart data={data.monthlyTrend} />
+            <IncomeExpenseChart data={data.monthlyTrend} onMonthClick={handleMonthClick} />
           </CardContent>
         </Card>
 
@@ -762,6 +783,94 @@ export function DashboardClient({ data }: { data: DashboardData | null }) {
           </CardContent>
         </Card>
       )}
+
+      {/* Month Breakdown Dialog */}
+      <Dialog open={!!breakdownMonth} onOpenChange={(open) => !open && setBreakdownMonth(null)}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{breakdownMonth} Breakdown</DialogTitle>
+          </DialogHeader>
+          {breakdownLoading ? (
+            <div className="text-center py-8 text-muted-foreground">Loading...</div>
+          ) : breakdownTxns.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">No transactions this month</div>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="bg-muted/50 rounded-lg p-3 text-center">
+                  <p className="text-lg font-bold text-emerald-600 tabular-nums">
+                    {formatCurrency(breakdownTxns.filter((t) => t.type === "INCOME").reduce((s, t) => s + t.convertedAmount, 0))}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Income</p>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3 text-center">
+                  <p className="text-lg font-bold text-red-500 tabular-nums">
+                    {formatCurrency(breakdownTxns.filter((t) => t.type === "EXPENSE").reduce((s, t) => s + t.convertedAmount, 0))}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Expenses</p>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3 text-center">
+                  <p className="text-lg font-bold tabular-nums">
+                    {formatCurrency(
+                      breakdownTxns.filter((t) => t.type === "INCOME").reduce((s, t) => s + t.convertedAmount, 0) -
+                        breakdownTxns.filter((t) => t.type === "EXPENSE").reduce((s, t) => s + t.convertedAmount, 0),
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Savings</p>
+                </div>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Account</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {breakdownTxns.map((t) => {
+                    const CIcon = getCategoryIcon(t.category?.icon || "tag");
+                    return (
+                      <TableRow key={t.id}>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                          {new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-6 h-6 rounded flex items-center justify-center shrink-0"
+                              style={{ backgroundColor: (t.category?.color || "#6B7280") + "20" }}
+                            >
+                              <CIcon className="w-3 h-3" style={{ color: t.category?.color || "#6B7280" }} />
+                            </div>
+                            <span className="text-sm font-medium truncate max-w-[200px]">{t.description}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {t.category && (
+                            <Badge variant="secondary" className="text-xs" style={{ backgroundColor: t.category.color + "20", color: t.category.color }}>
+                              {t.category.name}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{t.account.name}</TableCell>
+                        <TableCell className="text-right">
+                          <span className={`text-sm font-semibold tabular-nums ${t.type === "INCOME" ? "text-emerald-600" : "text-foreground"}`}>
+                            {t.type === "INCOME" ? "+" : "-"}
+                            {currencyFormatter(t.account.currency)(t.amount)}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
