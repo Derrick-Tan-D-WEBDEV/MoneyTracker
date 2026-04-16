@@ -683,7 +683,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                                     return (
                                       <SelectItem key={c.id} value={c.name}>
                                         <span className="flex items-center gap-2">
-                                          <CIcon className="w-3.5 h-3.5 shrink-0" style={{ color: c.color }} />
+                                          <CIcon className="w-3.5 h-3.5 shrink-0" />
                                           {c.name}
                                         </span>
                                       </SelectItem>
