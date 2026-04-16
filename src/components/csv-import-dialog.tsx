@@ -11,8 +11,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Upload, FileText, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { importTransactions, checkTransactionAchievements, checkDuplicateTransactions } from "@/actions/transactions";
+import { getCategories } from "@/actions/categories";
 import { toast } from "sonner";
 import { parseBankStatementPDF, BANK_OPTIONS, type BankFormat } from "@/lib/pdf-parser";
+
+interface Category {
+  id: string;
+  name: string;
+  type: "INCOME" | "EXPENSE";
+  icon: string | null;
+}
 
 type ColumnMapping = "skip" | "date" | "description" | "type" | "category" | "amount" | "notes";
 
@@ -93,8 +101,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
   const [reviewRows, setReviewRows] = useState<ReviewRow[]>([]);
   const [adjustBalance, setAdjustBalance] = useState(false);
   const [selectedBank, setSelectedBank] = useState<BankFormat | "">("");
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-
+  const [pendingFile, setPendingFile] = useState<File | null>(null);  const [categories, setCategories] = useState<Category[]>([]);
   const reset = () => {
     setStep("upload");
     setFileType("csv");
@@ -111,7 +118,18 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
     setAdjustBalance(false);
     setSelectedBank("");
     setPendingFile(null);
+    setCategories([]);
   };
+
+  // Fetch categories when entering review step
+  const loadCategories = useCallback(async () => {
+    try {
+      const cats = await getCategories();
+      setCategories(cats as Category[]);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const handleClose = (open: boolean) => {
     if (!open) reset();
@@ -189,6 +207,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
       setReviewRows(rows);
       setParsing(false);
       setStep("review");
+      loadCategories();
     } catch {
       toast.error("Failed to parse PDF file");
       setParsing(false);
@@ -260,6 +279,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
     mapped = await markDuplicates(mapped, accountId);
     setReviewRows(mapped);
     setStep("review");
+    loadCategories();
   };
 
   const toggleRow = (id: number) => {
@@ -271,7 +291,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
     setReviewRows((prev) => prev.map((r) => ({ ...r, selected: !allSelected })));
   };
 
-  const updateRow = (id: number, field: keyof ReviewRow, value: string | number) => {
+  const updateRow = (id: number, field: keyof ReviewRow, value: string | number | null) => {
     setReviewRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
   };
 
@@ -614,6 +634,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                         <TableHead className="w-[90px]">Date</TableHead>
                         <TableHead>Description</TableHead>
                         <TableHead className="w-[90px]">Type</TableHead>
+                        <TableHead className="w-[130px]">Category</TableHead>
                         <TableHead className="w-[100px] text-right">Amount</TableHead>
                         <TableHead className="w-[110px] text-right">Balance</TableHead>
                       </TableRow>
@@ -645,6 +666,26 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                             >
                               {row.type}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={row.categoryName || "__none__"}
+                              onValueChange={(v) => updateRow(row.id, "categoryName", v === "__none__" ? null : v)}
+                            >
+                              <SelectTrigger className="h-7 text-xs w-[120px]">
+                                <SelectValue>{(value: string) => value === "__none__" ? <span className="text-muted-foreground">—</span> : value}</SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none__">None</SelectItem>
+                                {categories
+                                  .filter((c) => c.type === row.type)
+                                  .map((c) => (
+                                    <SelectItem key={c.id} value={c.name}>
+                                      {c.icon ? `${c.icon} ` : ""}{c.name}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell className="text-right">
                             <Input
