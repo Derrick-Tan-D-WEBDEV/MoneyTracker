@@ -21,7 +21,7 @@ export function IncomeExpenseChart({ data, onMonthClick }: { data: MonthlyData[]
         barCategoryGap="20%"
         onClick={(state) => {
           if (state?.activeLabel && onMonthClick) {
-            onMonthClick(state.activeLabel);
+            onMonthClick(String(state.activeLabel));
           }
         }}
         onMouseMove={(state) => {
