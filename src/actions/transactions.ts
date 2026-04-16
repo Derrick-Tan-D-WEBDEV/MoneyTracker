@@ -295,7 +295,7 @@ const importRowSchema = z.object({
   categoryName: z.string().optional().nullable(),
 });
 
-export async function importTransactions(rows: z.input<typeof importRowSchema>[], options?: { adjustBalance?: boolean }) {
+export async function importTransactions(rows: z.input<typeof importRowSchema>[], options?: { adjustBalance?: boolean; targetBalance?: { accountId: string; balance: number } }) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
   const encKey = await getEncryptionKey();
@@ -353,7 +353,13 @@ export async function importTransactions(rows: z.input<typeof importRowSchema>[]
   }
 
   // Batch update account balances
-  if (adjustBalance) {
+  if (options?.targetBalance) {
+    // Set balance to a specific value (e.g. last statement balance from bank PDF)
+    await db.financialAccount.update({
+      where: { id: options.targetBalance.accountId },
+      data: { balance: encryptAmount(options.targetBalance.balance, encKey) },
+    });
+  } else if (adjustBalance) {
     for (const [accountId, change] of balanceChanges) {
       const acct = await db.financialAccount.findUnique({ where: { id: accountId } });
       const currentBalance = decryptAmount(acct!.balance, encKey);

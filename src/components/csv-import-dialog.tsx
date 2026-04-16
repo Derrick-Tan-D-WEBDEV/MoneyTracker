@@ -100,7 +100,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{ imported: number; skipped: number; total: number } | null>(null);
   const [reviewRows, setReviewRows] = useState<ReviewRow[]>([]);
-  const [adjustBalance, setAdjustBalance] = useState(false);
+  const [balanceMode, setBalanceMode] = useState<"none" | "adjust" | "set">("none");
   const [selectedBank, setSelectedBank] = useState<BankFormat | "">("");
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -117,7 +117,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
     setImporting(false);
     setResult(null);
     setReviewRows([]);
-    setAdjustBalance(false);
+    setBalanceMode("none");
     setSelectedBank("");
     setPendingFile(null);
     setCategories([]);
@@ -343,7 +343,11 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
         accountId,
       }));
 
-      const res = await importTransactions(rows, { adjustBalance });
+      // Determine balance update mode
+      const lastStmt = reviewRows.filter((r) => r.selected && r.statementBalance != null);
+      const targetBalance = balanceMode === "set" && lastStmt.length > 0 ? { accountId, balance: lastStmt[lastStmt.length - 1].statementBalance! } : undefined;
+
+      const res = await importTransactions(rows, { adjustBalance: balanceMode === "adjust", targetBalance });
       setResult(res);
 
       if (res.imported > 0) {
@@ -593,16 +597,26 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                     <p className="text-xs text-muted-foreground">Expenses</p>
                   </div>
                   <div className="bg-muted/50 rounded-lg p-3 text-center">
-                    <p className="text-lg font-bold tabular-nums">{hasStatementBalance && firstStmtBal != null ? firstStmtBal.toFixed(2) : startingBalance.toFixed(2)}</p>
-                    <p className="text-xs text-muted-foreground">{hasStatementBalance ? "First Bal" : "Current Bal"}</p>
+                    <p className="text-lg font-bold tabular-nums">{startingBalance.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">Current Bal</p>
                   </div>
                   <div
-                    className={`rounded-lg p-3 text-center ${hasStatementBalance ? "bg-muted/50" : adjustBalance ? (finalBalance >= startingBalance ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-red-50 dark:bg-red-950/30") : "bg-muted/50"}`}
+                    className={`rounded-lg p-3 text-center ${
+                      balanceMode !== "none"
+                        ? (balanceMode === "set" ? (lastStmtBal ?? startingBalance) : finalBalance) >= startingBalance
+                          ? "bg-emerald-50 dark:bg-emerald-950/30"
+                          : "bg-red-50 dark:bg-red-950/30"
+                        : "bg-muted/50"
+                    }`}
                   >
-                    <p className={`text-lg font-bold tabular-nums ${!hasStatementBalance && adjustBalance ? (finalBalance >= startingBalance ? "text-emerald-600" : "text-red-500") : ""}`}>
-                      {hasStatementBalance && lastStmtBal != null ? lastStmtBal.toFixed(2) : adjustBalance ? finalBalance.toFixed(2) : startingBalance.toFixed(2)}
+                    <p
+                      className={`text-lg font-bold tabular-nums ${
+                        balanceMode !== "none" ? ((balanceMode === "set" ? (lastStmtBal ?? startingBalance) : finalBalance) >= startingBalance ? "text-emerald-600" : "text-red-500") : ""
+                      }`}
+                    >
+                      {balanceMode === "set" && lastStmtBal != null ? lastStmtBal.toFixed(2) : balanceMode === "adjust" ? finalBalance.toFixed(2) : startingBalance.toFixed(2)}
                     </p>
-                    <p className="text-xs text-muted-foreground">{hasStatementBalance ? "Last Bal" : "After Import"}</p>
+                    <p className="text-xs text-muted-foreground">After Import</p>
                   </div>
                 </div>
 
@@ -615,20 +629,33 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                   </div>
                 )}
 
-                <div className="flex items-center justify-between bg-muted/50 rounded-lg p-3">
-                  <div>
-                    <p className="text-sm font-medium">Adjust account balance</p>
-                    <p className="text-xs text-muted-foreground">Turn on if your account balance doesn&apos;t reflect these transactions yet</p>
+                <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                  <p className="text-sm font-medium">Account balance after import</p>
+                  <div className="space-y-1.5">
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input type="radio" name="balanceMode" checked={balanceMode === "none"} onChange={() => setBalanceMode("none")} className="mt-0.5" />
+                      <div>
+                        <p className="text-sm">Don&apos;t change balance</p>
+                        <p className="text-xs text-muted-foreground">Your account balance already reflects these transactions (e.g. you entered them manually before)</p>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input type="radio" name="balanceMode" checked={balanceMode === "adjust"} onChange={() => setBalanceMode("adjust")} className="mt-0.5" />
+                      <div>
+                        <p className="text-sm">Adjust by transaction totals</p>
+                        <p className="text-xs text-muted-foreground">Add income and subtract expenses from your current balance ({startingBalance.toFixed(2)})</p>
+                      </div>
+                    </label>
+                    {hasStatementBalance && lastStmtBal != null && (
+                      <label className="flex items-start gap-2 cursor-pointer">
+                        <input type="radio" name="balanceMode" checked={balanceMode === "set"} onChange={() => setBalanceMode("set")} className="mt-0.5" />
+                        <div>
+                          <p className="text-sm">Set to statement balance</p>
+                          <p className="text-xs text-muted-foreground">Set your account balance to the last statement balance ({lastStmtBal.toFixed(2)})</p>
+                        </div>
+                      </label>
+                    )}
                   </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={adjustBalance}
-                    onClick={() => setAdjustBalance(!adjustBalance)}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${adjustBalance ? "bg-emerald-500" : "bg-muted-foreground/30"}`}
-                  >
-                    <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${adjustBalance ? "translate-x-4" : "translate-x-0"}`} />
-                  </button>
                 </div>
 
                 <div className="border rounded-lg overflow-auto max-h-[400px]">
