@@ -186,7 +186,11 @@ export function TransactionsClient() {
   const handleDelete = async (id: string) => {
     try {
       await deleteTransaction(id);
-      setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       toast.success("Transaction deleted");
       fetchData();
     } catch (error) {
@@ -212,7 +216,8 @@ export function TransactionsClient() {
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -657,12 +662,7 @@ export function TransactionsClient() {
                   <TableRow key={t.id} className={selectedIds.has(t.id) ? "bg-muted/50" : ""}>
                     {!isPartnerView && (
                       <TableCell>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(t.id)}
-                          onChange={() => toggleSelect(t.id)}
-                          className="rounded border-muted-foreground"
-                        />
+                        <input type="checkbox" checked={selectedIds.has(t.id)} onChange={() => toggleSelect(t.id)} className="rounded border-muted-foreground" />
                       </TableCell>
                     )}
                     <TableCell>
