@@ -208,10 +208,7 @@ export function AppSidebar() {
   return (
     <TooltipProvider delay={0}>
       <aside
-        className={cn(
-          "fixed left-0 top-0 z-40 h-screen hidden md:flex flex-col border-r bg-card py-4 transition-all duration-200",
-          collapsed ? "w-16 items-center" : "w-52",
-        )}
+        className={cn("fixed left-0 top-0 z-40 h-screen hidden md:flex flex-col border-r bg-card py-4 transition-all duration-200", collapsed ? "w-16 items-center" : "w-52")}
         onMouseEnter={() => setCollapsed(false)}
         onMouseLeave={() => setCollapsed(true)}
       >
