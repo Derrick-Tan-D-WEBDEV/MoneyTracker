@@ -101,7 +101,8 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
   const [reviewRows, setReviewRows] = useState<ReviewRow[]>([]);
   const [adjustBalance, setAdjustBalance] = useState(false);
   const [selectedBank, setSelectedBank] = useState<BankFormat | "">("");
-  const [pendingFile, setPendingFile] = useState<File | null>(null);  const [categories, setCategories] = useState<Category[]>([]);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   const reset = () => {
     setStep("upload");
     setFileType("csv");
@@ -668,12 +669,9 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Select
-                              value={row.categoryName || "__none__"}
-                              onValueChange={(v) => updateRow(row.id, "categoryName", v === "__none__" ? null : v)}
-                            >
+                            <Select value={row.categoryName || "__none__"} onValueChange={(v) => updateRow(row.id, "categoryName", v === "__none__" ? null : v)}>
                               <SelectTrigger className="h-7 text-xs w-[120px]">
-                                <SelectValue>{(value: string) => value === "__none__" ? <span className="text-muted-foreground">—</span> : value}</SelectValue>
+                                <SelectValue>{(value: string) => (value === "__none__" ? <span className="text-muted-foreground">—</span> : value)}</SelectValue>
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="__none__">None</SelectItem>
@@ -681,7 +679,8 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                                   .filter((c) => c.type === row.type)
                                   .map((c) => (
                                     <SelectItem key={c.id} value={c.name}>
-                                      {c.icon ? `${c.icon} ` : ""}{c.name}
+                                      {c.icon ? `${c.icon} ` : ""}
+                                      {c.name}
                                     </SelectItem>
                                   ))}
                               </SelectContent>
