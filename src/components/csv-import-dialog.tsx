@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import Papa from "papaparse";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -122,6 +122,11 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
     setPendingFile(null);
     setCategories([]);
   };
+
+  // Sync accountId when defaultAccountId prop changes (e.g. import from specific account)
+  useEffect(() => {
+    if (defaultAccountId) setAccountId(defaultAccountId);
+  }, [defaultAccountId]);
 
   // Fetch categories when entering review step
   const loadCategories = useCallback(async () => {
@@ -552,7 +557,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
 
             return (
               <div className="space-y-4">
-                {!defaultAccountId && !accountId && (
+                {!defaultAccountId && (
                   <div className="space-y-2">
                     <Label>Target Account *</Label>
                     <Select value={accountId} onValueChange={(v) => v && setAccountId(v)}>
