@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Upload, FileText, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { getCategoryIcon } from "@/lib/category-icons";
 import { importTransactions, checkTransactionAchievements, checkDuplicateTransactions } from "@/actions/transactions";
 import { getCategories } from "@/actions/categories";
 import { toast } from "sonner";
@@ -677,12 +678,17 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                                 <SelectItem value="__none__">None</SelectItem>
                                 {categories
                                   .filter((c) => c.type === row.type)
-                                  .map((c) => (
-                                    <SelectItem key={c.id} value={c.name}>
-                                      {c.icon ? `${c.icon} ` : ""}
-                                      {c.name}
-                                    </SelectItem>
-                                  ))}
+                                  .map((c) => {
+                                    const CIcon = getCategoryIcon(c.icon);
+                                    return (
+                                      <SelectItem key={c.id} value={c.name}>
+                                        <span className="flex items-center gap-2">
+                                          <CIcon className="w-3.5 h-3.5 shrink-0" style={{ color: c.color }} />
+                                          {c.name}
+                                        </span>
+                                      </SelectItem>
+                                    );
+                                  })}
                               </SelectContent>
                             </Select>
                           </TableCell>
