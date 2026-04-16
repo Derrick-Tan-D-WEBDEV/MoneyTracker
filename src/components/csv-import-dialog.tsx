@@ -679,7 +679,7 @@ export function CSVImportDialog({ open, onOpenChange, accounts, onImported, defa
                                 {categories
                                   .filter((c) => c.type === row.type)
                                   .map((c) => {
-                                    const CIcon = getCategoryIcon(c.icon);
+                                    const CIcon = getCategoryIcon(c.icon || "");
                                     return (
                                       <SelectItem key={c.id} value={c.name}>
                                         <span className="flex items-center gap-2">
