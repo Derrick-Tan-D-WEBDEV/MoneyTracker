@@ -15,7 +15,7 @@ import { Plus, ArrowUpRight, ArrowDownRight, ArrowRightLeft, Trash2, Pencil, Fil
 import { usePartnerView } from "@/hooks/use-partner-view";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { CSVImportDialog } from "@/components/csv-import-dialog";
-import { getTransactions, createTransaction, updateTransaction, deleteTransaction, checkTransactionAchievements } from "@/actions/transactions";
+import { getTransactions, createTransaction, updateTransaction, deleteTransaction, bulkDeleteTransactions, checkTransactionAchievements } from "@/actions/transactions";
 import { getTags, createTag, updateTransactionTags } from "@/actions/tags";
 import { getAccounts } from "@/actions/accounts";
 import { getCategories } from "@/actions/categories";
@@ -74,6 +74,8 @@ export function TransactionsClient() {
   const [filterStartDate, setFilterStartDate] = useState("");
   const [filterEndDate, setFilterEndDate] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // Form state
   const [formType, setFormType] = useState<"EXPENSE" | "INCOME" | "TRANSFER">("EXPENSE");
@@ -184,10 +186,42 @@ export function TransactionsClient() {
   const handleDelete = async (id: string) => {
     try {
       await deleteTransaction(id);
+      setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
       toast.success("Transaction deleted");
       fetchData();
     } catch (error) {
       toast.error("Failed to delete transaction");
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkDeleting(true);
+    try {
+      const res = await bulkDeleteTransactions([...selectedIds]);
+      setSelectedIds(new Set());
+      toast.success(`${res.deleted} transaction${res.deleted > 1 ? "s" : ""} deleted`);
+      fetchData();
+    } catch (error) {
+      toast.error("Failed to delete transactions");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === displayedTransactions.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(displayedTransactions.map((t) => t.id)));
     }
   };
 
@@ -586,6 +620,16 @@ export function TransactionsClient() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  {!isPartnerView && (
+                    <TableHead className="w-[40px]">
+                      <input
+                        type="checkbox"
+                        checked={displayedTransactions.length > 0 && selectedIds.size === displayedTransactions.length}
+                        onChange={toggleSelectAll}
+                        className="rounded border-muted-foreground"
+                      />
+                    </TableHead>
+                  )}
                   <TableHead>Description</TableHead>
                   <TableHead>Category / Tags</TableHead>
                   <TableHead>Account</TableHead>
@@ -594,9 +638,33 @@ export function TransactionsClient() {
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
               </TableHeader>
+              {selectedIds.size > 0 && (
+                <caption className="caption-top">
+                  <div className="flex items-center gap-3 px-2 py-2 bg-muted/50 rounded-lg mb-2">
+                    <span className="text-sm font-medium">{selectedIds.size} selected</span>
+                    <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={handleBulkDelete} disabled={bulkDeleting}>
+                      <Trash2 className="w-3.5 h-3.5 mr-1" />
+                      {bulkDeleting ? "Deleting..." : `Delete ${selectedIds.size}`}
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedIds(new Set())}>
+                      Clear selection
+                    </Button>
+                  </div>
+                </caption>
+              )}
               <TableBody>
                 {displayedTransactions.map((t) => (
-                  <TableRow key={t.id}>
+                  <TableRow key={t.id} className={selectedIds.has(t.id) ? "bg-muted/50" : ""}>
+                    {!isPartnerView && (
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(t.id)}
+                          onChange={() => toggleSelect(t.id)}
+                          className="rounded border-muted-foreground"
+                        />
+                      </TableCell>
+                    )}
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div

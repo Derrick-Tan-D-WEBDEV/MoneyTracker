@@ -285,6 +285,76 @@ export async function deleteTransaction(id: string) {
   revalidatePath("/transactions");
 }
 
+export async function bulkDeleteTransactions(ids: string[]) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  if (ids.length === 0) throw new Error("No transactions selected");
+  if (ids.length > 500) throw new Error("Maximum 500 transactions per bulk delete");
+  const encKey = await getEncryptionKey();
+
+  const transactions = await db.transaction.findMany({
+    where: { id: { in: ids }, userId: session.user.id },
+  });
+  if (transactions.length === 0) throw new Error("No transactions found");
+
+  // Collect balance changes per account
+  const balanceChanges = new Map<string, number>();
+  const transferIds = new Set<string>();
+
+  for (const tx of transactions) {
+    if (tx.type === "TRANSFER" && tx.transferId) {
+      transferIds.add(tx.transferId);
+    } else {
+      const txAmount = decryptAmount(tx.amount, encKey);
+      const change = tx.type === "INCOME" ? -txAmount : txAmount;
+      balanceChanges.set(tx.accountId, (balanceChanges.get(tx.accountId) || 0) + change);
+    }
+  }
+
+  // Handle transfers: find all paired transactions
+  if (transferIds.size > 0) {
+    const pairedTxs = await db.transaction.findMany({
+      where: { transferId: { in: [...transferIds] }, userId: session.user.id },
+    });
+    for (const t of pairedTxs) {
+      const txAmount = decryptAmount(t.amount, encKey);
+      // Source transactions (in selected ids) get balance added back
+      // Destination transactions get balance subtracted
+      const isSource = ids.includes(t.id);
+      const change = isSource ? txAmount : -txAmount;
+      balanceChanges.set(t.accountId, (balanceChanges.get(t.accountId) || 0) + change);
+    }
+    // Delete all paired transactions
+    await db.transaction.deleteMany({
+      where: { transferId: { in: [...transferIds] }, userId: session.user.id },
+    });
+  }
+
+  // Delete non-transfer transactions
+  const nonTransferIds = transactions.filter((tx) => !tx.transferId).map((tx) => tx.id);
+  if (nonTransferIds.length > 0) {
+    await db.transaction.deleteMany({
+      where: { id: { in: nonTransferIds }, userId: session.user.id },
+    });
+  }
+
+  // Apply balance changes
+  for (const [accountId, change] of balanceChanges) {
+    const acct = await db.financialAccount.findUnique({ where: { id: accountId } });
+    if (acct) {
+      const currentBalance = decryptAmount(acct.balance, encKey);
+      await db.financialAccount.update({
+        where: { id: accountId },
+        data: { balance: encryptAmount(currentBalance + change, encKey) },
+      });
+    }
+  }
+
+  revalidatePath("/");
+  revalidatePath("/transactions");
+  return { deleted: transactions.length };
+}
+
 const importRowSchema = z.object({
   accountId: z.string().uuid(),
   type: z.enum(["EXPENSE", "INCOME", "TRANSFER"]),
