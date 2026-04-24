@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -68,7 +68,7 @@ export function DebtPayoffCalculator({ debts }: DebtPayoffCalculatorProps) {
   const [customOrder, setCustomOrder] = useState<string[]>(() => activeDebts.map((d) => d.id));
 
   // Keep customOrder in sync if debts change
-  useMemo(() => {
+  useEffect(() => {
     const activeIds = new Set(activeDebts.map((d) => d.id));
     setCustomOrder((prev) => {
       const filtered = prev.filter((id) => activeIds.has(id));
