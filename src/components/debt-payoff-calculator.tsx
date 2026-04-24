@@ -22,6 +22,7 @@ import {
 import { calculatePayoff, compareStrategies, compareAllStrategies, calculateMinimumTotalPayment, type DebtInput } from "@/lib/debt-strategies";
 import { generateDebtPayoffPDF } from "@/lib/pdf-export";
 import { currencyFormatter } from "@/lib/format";
+import { convertCurrency } from "@/lib/exchange-rates";
 import { useSession } from "next-auth/react";
 import {
   TrendingDown,
@@ -52,16 +53,28 @@ import {
 
 interface DebtPayoffCalculatorProps {
   debts: DebtInput[];
+  rates: Record<string, number>;
 }
 
-export function DebtPayoffCalculator({ debts }: DebtPayoffCalculatorProps) {
+export function DebtPayoffCalculator({ debts, rates }: DebtPayoffCalculatorProps) {
   const { data: session } = useSession();
   const userCurrency = session?.user?.currency || "MYR";
   const formatCurrency = currencyFormatter(userCurrency);
 
+  // Convert all debts to user currency so strategy math is apples-to-apples
+  const convertedDebts = useMemo(
+    () =>
+      debts.map((d) => ({
+        ...d,
+        remainingAmount: convertCurrency(d.remainingAmount, d.currency, userCurrency, rates),
+        minimumPayment: convertCurrency(d.minimumPayment, d.currency, userCurrency, rates),
+      })),
+    [debts, userCurrency, rates],
+  );
+
   // Stabilize activeDebts so useMemo deps below actually memoize
-  const debtKey = debts.map((d) => `${d.id}:${d.remainingAmount}`).join(",");
-  const activeDebts = useMemo(() => debts.filter((d) => d.remainingAmount > 0), [debtKey]);
+  const debtKey = convertedDebts.map((d) => `${d.id}:${d.remainingAmount}`).join(",");
+  const activeDebts = useMemo(() => convertedDebts.filter((d) => d.remainingAmount > 0), [debtKey]);
   const totalOwed = activeDebts.reduce((s, d) => s + d.remainingAmount, 0);
   const totalMinPayment = calculateMinimumTotalPayment(activeDebts);
 
@@ -132,6 +145,11 @@ export function DebtPayoffCalculator({ debts }: DebtPayoffCalculatorProps) {
           </h2>
           <p className="text-sm text-muted-foreground">
             Compare strategies and see when you&apos;ll be debt-free
+            {debts.some((d) => d.currency !== userCurrency) && (
+              <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">
+                (amounts converted to {userCurrency})
+              </span>
+            )}
           </p>
         </div>
       </div>

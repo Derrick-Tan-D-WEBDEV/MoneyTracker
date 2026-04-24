@@ -715,7 +715,7 @@ export function DebtsClient() {
       {/* Payoff Calculator */}
       {activeDebts.length > 0 && (
         <div className="mb-2">
-          <DebtPayoffCalculator debts={calculatorDebts} />
+          <DebtPayoffCalculator debts={calculatorDebts} rates={rates} />
         </div>
       )}
 
