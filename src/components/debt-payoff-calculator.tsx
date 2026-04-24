@@ -43,6 +43,8 @@ import {
   FileDown,
   PartyPopper,
   Sparkles,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import {
@@ -897,54 +899,69 @@ function PayoffCalendar({
     }
   }
 
+  const [expanded, setExpanded] = useState(false);
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-purple-500" />
-          Payoff Calendar
-        </CardTitle>
-        <CardDescription>Which debt gets paid off in which month</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {years.map((y) => (
-            <div key={y.year}>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{y.year}</p>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                {y.months.map((m) => (
-                  <div
-                    key={m.offset}
-                    className={`rounded-lg border p-2 min-h-[64px] flex flex-col ${
-                      m.debts.length > 0 ? "bg-purple-50/50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800" : "bg-muted/30"
-                    }`}
-                  >
-                    <span className="text-[10px] font-medium text-muted-foreground">{m.label}</span>
-                    <div className="flex-1 flex flex-col justify-end gap-1 mt-1">
-                      {m.debts.map((s) => {
-                        const debt = debts.find((d) => d.id === s.debtId);
-                        return (
-                          <div
-                            key={s.debtId}
-                            className="text-[10px] font-medium truncate px-1.5 py-0.5 rounded"
-                            style={{
-                              backgroundColor: (debt?.color || "#8B5CF6") + "20",
-                              color: debt?.color || "#8B5CF6",
-                            }}
-                            title={s.name}
-                          >
-                            {s.name}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <div>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-purple-500" />
+            Payoff Calendar
+          </CardTitle>
+          <CardDescription>Which debt gets paid off in which month</CardDescription>
         </div>
-      </CardContent>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1 text-muted-foreground"
+          onClick={() => setExpanded((e) => !e)}
+        >
+          {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          {expanded ? "Collapse" : "Expand"}
+        </Button>
+      </CardHeader>
+      {expanded && (
+        <CardContent>
+          <div className="space-y-4">
+            {years.map((y) => (
+              <div key={y.year}>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{y.year}</p>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                  {y.months.map((m) => (
+                    <div
+                      key={m.offset}
+                      className={`rounded-lg border p-2 min-h-[64px] flex flex-col ${
+                        m.debts.length > 0 ? "bg-purple-50/50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800" : "bg-muted/30"
+                      }`}
+                    >
+                      <span className="text-[10px] font-medium text-muted-foreground">{m.label}</span>
+                      <div className="flex-1 flex flex-col justify-end gap-1 mt-1">
+                        {m.debts.map((s) => {
+                          const debt = debts.find((d) => d.id === s.debtId);
+                          return (
+                            <div
+                              key={s.debtId}
+                              className="text-[10px] font-medium truncate px-1.5 py-0.5 rounded"
+                              style={{
+                                backgroundColor: (debt?.color || "#8B5CF6") + "20",
+                                color: debt?.color || "#8B5CF6",
+                              }}
+                              title={s.name}
+                            >
+                              {s.name}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      )}
     </Card>
   );
 }
