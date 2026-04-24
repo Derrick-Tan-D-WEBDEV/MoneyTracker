@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +41,10 @@ import {
   ArrowDown,
   GripVertical,
   FileDown,
+  PartyPopper,
+  Sparkles,
 } from "lucide-react";
+import confetti from "canvas-confetti";
 import {
   Table,
   TableHeader,
@@ -101,6 +104,20 @@ export function DebtPayoffCalculator({ debts, rates }: DebtPayoffCalculatorProps
     });
   }, [activeDebtIdsKey, activeDebts]);
 
+  // Debt-free celebration
+  const hasCelebrated = useRef(false);
+  useEffect(() => {
+    if (activeDebts.length === 0 && debts.length > 0 && !hasCelebrated.current) {
+      hasCelebrated.current = true;
+      confetti({
+        particleCount: 120,
+        spread: 80,
+        origin: { y: 0.6 },
+        colors: ["#10B981", "#3B82F6", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"],
+      });
+    }
+  }, [activeDebts.length, debts.length]);
+
   const comparison = useMemo(() => {
     if (activeDebts.length === 0) return null;
     if (strategy === "custom") {
@@ -109,6 +126,28 @@ export function DebtPayoffCalculator({ debts, rates }: DebtPayoffCalculatorProps
     return compareStrategies(activeDebts, extraPayment);
   }, [activeDebts, extraPayment, strategy, customOrder]);
 
+  if (activeDebts.length === 0) {
+    return (
+      <Card className="border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
+        <CardContent className="pt-6 pb-6">
+          <div className="flex flex-col items-center text-center gap-3">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+              <PartyPopper className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-emerald-800 dark:text-emerald-300">
+                You&apos;re Debt-Free! 🎉
+              </h2>
+              <p className="text-sm text-emerald-700 dark:text-emerald-400 mt-1">
+                All your debts are fully paid off. Great work building financial freedom.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const selectedResult = useMemo(() => {
     if (!comparison) return null;
     if ("custom" in comparison) {
@@ -116,8 +155,6 @@ export function DebtPayoffCalculator({ debts, rates }: DebtPayoffCalculatorProps
     }
     return strategy === "avalanche" ? comparison.avalanche : comparison.snowball;
   }, [comparison, strategy]);
-
-  if (activeDebts.length === 0) return null;
 
   const chartData =
     comparison?.avalanche.monthlySnapshots.map((a, i) => ({
@@ -192,7 +229,7 @@ export function DebtPayoffCalculator({ debts, rates }: DebtPayoffCalculatorProps
                   ? "Highest interest first. Saves the most money."
                   : strategy === "snowball"
                     ? "Lowest balance first. Quick wins for motivation."
-                    : "Drag to set your own payoff priority order."}
+                    : "Use arrows to set your own payoff priority order."}
               </p>
             </div>
 
@@ -323,7 +360,7 @@ export function DebtPayoffCalculator({ debts, rates }: DebtPayoffCalculatorProps
               className="gap-1.5"
               onClick={() => {
                 if (!comparison) return;
-                generateDebtPayoffPDF(selectedResult, comparison as { avalanche: typeof selectedResult; snowball: typeof selectedResult }, userCurrency);
+                generateDebtPayoffPDF(selectedResult, comparison, userCurrency);
               }}
             >
               <FileDown className="w-3.5 h-3.5" />
@@ -572,7 +609,18 @@ export function DebtPayoffCalculator({ debts, rates }: DebtPayoffCalculatorProps
                           </div>
                           <div className="mt-2">
                             <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                              <span>{formatCurrency(debt.remainingAmount)}</span>
+                              <span>
+                                {formatCurrency(debt.remainingAmount)}
+                                {(() => {
+                                  const original = debts.find((d) => d.id === schedule.debtId);
+                                  if (!original || original.currency === userCurrency) return null;
+                                  return (
+                                    <span className="text-muted-foreground/60 ml-1">
+                                      ({original.currency} {original.remainingAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                                    </span>
+                                  );
+                                })()}
+                              </span>
                               <span>
                                 Interest: {formatCurrency(schedule.totalInterest)}
                               </span>
@@ -590,6 +638,13 @@ export function DebtPayoffCalculator({ debts, rates }: DebtPayoffCalculatorProps
               </div>
             </CardContent>
           </Card>
+
+          {/* Payoff Calendar */}
+          <PayoffCalendar
+            schedules={selectedResult.debtSchedules}
+            debts={activeDebts}
+            userCurrency={userCurrency}
+          />
 
           {/* Amortization Schedule */}
           {selectedResult.debtSchedules.length > 0 && (
@@ -713,7 +768,7 @@ function AmortizationTable({
       ["Month", "Date", "Starting Balance", "Payment", "Interest", "Principal", "Ending Balance"],
       ...schedule.monthlyBreakdown.map((m) => [
         String(m.month),
-        new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" }), // approximate
+        addMonths(new Date(), m.month).toLocaleDateString("en-US", { month: "short", year: "numeric" }),
         String(m.startingBalance.toFixed(2)),
         String(m.payment.toFixed(2)),
         String(m.interest.toFixed(2)),
@@ -790,6 +845,105 @@ function AmortizationTable({
         ) : (
           <p className="text-sm text-muted-foreground text-center py-8">No amortization data available.</p>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PayoffCalendar({
+  schedules,
+  debts,
+  userCurrency,
+}: {
+  schedules: ReturnType<typeof calculatePayoff>["debtSchedules"];
+  debts: DebtInput[];
+  userCurrency: string;
+}) {
+  if (schedules.length === 0) return null;
+
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  // Build a map of month-offset → debts paid off
+  const payoffMap = new Map<number, typeof schedules>();
+  for (const s of schedules) {
+    const list = payoffMap.get(s.payoffMonth) ?? [];
+    list.push(s);
+    payoffMap.set(s.payoffMonth, list);
+  }
+
+  // Determine the year range to show
+  const maxMonth = Math.max(...schedules.map((s) => s.payoffMonth));
+  const startYear = currentYear;
+  const endYear = currentYear + Math.floor((currentMonth + maxMonth) / 12);
+
+  const years: { year: number; months: { label: string; offset: number; debts: typeof schedules }[] }[] = [];
+  for (let y = startYear; y <= endYear; y++) {
+    const yearMonths = [];
+    for (let m = 0; m < 12; m++) {
+      const offset = (y - currentYear) * 12 + (m - currentMonth);
+      if (offset < 1) continue; // skip past months
+      if (offset > maxMonth + 1) break;
+      yearMonths.push({
+        label: monthNames[m],
+        offset,
+        debts: payoffMap.get(offset) ?? [],
+      });
+    }
+    if (yearMonths.length > 0) {
+      years.push({ year: y, months: yearMonths });
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-purple-500" />
+          Payoff Calendar
+        </CardTitle>
+        <CardDescription>Which debt gets paid off in which month</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {years.map((y) => (
+            <div key={y.year}>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{y.year}</p>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                {y.months.map((m) => (
+                  <div
+                    key={m.offset}
+                    className={`rounded-lg border p-2 min-h-[64px] flex flex-col ${
+                      m.debts.length > 0 ? "bg-purple-50/50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800" : "bg-muted/30"
+                    }`}
+                  >
+                    <span className="text-[10px] font-medium text-muted-foreground">{m.label}</span>
+                    <div className="flex-1 flex flex-col justify-end gap-1 mt-1">
+                      {m.debts.map((s) => {
+                        const debt = debts.find((d) => d.id === s.debtId);
+                        return (
+                          <div
+                            key={s.debtId}
+                            className="text-[10px] font-medium truncate px-1.5 py-0.5 rounded"
+                            style={{
+                              backgroundColor: (debt?.color || "#8B5CF6") + "20",
+                              color: debt?.color || "#8B5CF6",
+                            }}
+                            title={s.name}
+                          >
+                            {s.name}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );
