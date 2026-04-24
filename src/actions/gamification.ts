@@ -292,3 +292,46 @@ async function checkBalanceAchievements(userId: string, results: string[]) {
   if (totalBalanceUSD >= 100000) results.push(...(await tryUnlock(userId, "SAVINGS_100K")));
   if (totalBalanceUSD >= 1000000) results.push(...(await tryUnlock(userId, "SAVINGS_1M")));
 }
+
+/** Check net worth milestones (balance minus debts) */
+export async function checkNetWorthAchievements(): Promise<string[]> {
+  const session = await auth();
+  if (!session?.user?.id) return [];
+  const userId = session.user.id;
+
+  const user = await db.user.findUnique({ where: { id: userId }, select: { currency: true } });
+  const rates = await getExchangeRates("USD");
+  const encKey = await getEncryptionKey();
+
+  const accounts = await db.financialAccount.findMany({
+    where: { userId, isArchived: false },
+    select: { balance: true, reservedAmount: true, currency: true, type: true, creditLimit: true },
+  });
+
+  const debts = await db.debt.findMany({
+    where: { userId, isPaidOff: false },
+    select: { remainingAmount: true, currency: true },
+  });
+
+  let netWorthUSD = accounts.reduce((sum, a) => {
+    const effectiveBalance = decryptAmount(a.balance, encKey) - decryptAmount(a.reservedAmount, encKey);
+    const converted = convertCurrency(effectiveBalance, a.currency, "USD", rates);
+    if (a.type === "CREDIT_CARD") {
+      const limit = a.creditLimit ? convertCurrency(decryptAmount(a.creditLimit, encKey), a.currency, "USD", rates) : 0;
+      return sum - (limit - converted);
+    }
+    return sum + converted;
+  }, 0);
+
+  netWorthUSD -= debts.reduce((sum, d) => sum + convertCurrency(decryptAmount(d.remainingAmount, encKey), d.currency, "USD", rates), 0);
+
+  const results: string[] = [];
+  if (netWorthUSD >= 10000) results.push(...(await tryUnlock(userId, "NET_WORTH_10K")));
+  if (netWorthUSD >= 50000) results.push(...(await tryUnlock(userId, "NET_WORTH_50K")));
+  if (netWorthUSD >= 100000) results.push(...(await tryUnlock(userId, "NET_WORTH_100K")));
+  if (netWorthUSD >= 500000) results.push(...(await tryUnlock(userId, "NET_WORTH_500K")));
+  if (netWorthUSD >= 1000000) results.push(...(await tryUnlock(userId, "NET_WORTH_1M")));
+
+  if (results.length > 0) revalidatePath("/");
+  return results;
+}

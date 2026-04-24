@@ -15,15 +15,12 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET requests
   if (request.method !== "GET") return;
 
-  // Skip API routes, auth routes, and external requests
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/_next/") || url.origin !== self.location.origin) {
     return;
   }
 
-  // Network-first strategy for HTML pages
   if (request.headers.get("accept")?.includes("text/html")) {
     event.respondWith(
       fetch(request)
@@ -37,7 +34,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Cache-first for static assets (images, fonts, etc.)
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) return cached;
@@ -50,4 +46,24 @@ self.addEventListener("fetch", (event) => {
       });
     }),
   );
+});
+
+// Push notifications
+self.addEventListener("push", (event) => {
+  const data = event.data?.json() ?? {};
+  event.waitUntil(
+    self.registration.showNotification(data.title ?? "MoneyTracker", {
+      body: data.body ?? "",
+      icon: "/icons/icon-192x192.png",
+      badge: "/icons/icon-96x96.png",
+      tag: data.tag ?? "default",
+      data: data.url ? { url: data.url } : undefined,
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url ?? "/debts";
+  event.waitUntil(self.clients.openWindow(url));
 });

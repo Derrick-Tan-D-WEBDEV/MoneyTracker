@@ -64,6 +64,13 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { key: "STREAK_100", name: "Legendary Streak", description: "Maintain a 100-day streak", icon: "🐉", xp: 500, category: "streaks" },
   { key: "STREAK_365", name: "Year of Discipline", description: "Maintain a 365-day streak", icon: "🌟", xp: 1000, category: "streaks" },
 
+  // ─── Net Worth Milestones ────────────────────────────
+  { key: "NET_WORTH_10K", name: "Five Figures", description: "Reach a net worth of $10,000", icon: "📊", xp: 50, category: "milestones" },
+  { key: "NET_WORTH_50K", name: "Growing Wealth", description: "Reach a net worth of $50,000", icon: "💹", xp: 100, category: "milestones" },
+  { key: "NET_WORTH_100K", name: "Six-Figure Club", description: "Reach a net worth of $100,000", icon: "🏅", xp: 200, category: "milestones" },
+  { key: "NET_WORTH_500K", name: "Half-Millionaire", description: "Reach a net worth of $500,000", icon: "🥇", xp: 350, category: "milestones" },
+  { key: "NET_WORTH_1M", name: "Millionaire", description: "Reach a net worth of $1,000,000", icon: "💎", xp: 750, category: "milestones" },
+
   // ─── Milestones ──────────────────────────────────────
   { key: "LEVEL_5", name: "Rising Star", description: "Reach level 5", icon: "⭐", xp: 50, category: "milestones" },
   { key: "LEVEL_10", name: "Experienced", description: "Reach level 10", icon: "🌟", xp: 100, category: "milestones" },

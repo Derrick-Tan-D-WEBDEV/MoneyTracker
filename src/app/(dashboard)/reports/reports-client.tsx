@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, Area, AreaChart } from "recharts";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, Area, AreaChart, ReferenceLine } from "recharts";
 import { getReportData } from "@/actions/reports";
 import { getNetWorthHistory } from "@/actions/net-worth";
 import { currencyFormatter } from "@/lib/format";
@@ -210,28 +210,50 @@ export function ReportsClient() {
         </Card>
       </div>
 
-      {/* Monthly Savings Rate */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Monthly Savings</CardTitle>
-          <CardDescription>Net savings each month (income - expenses)</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" />
-              <YAxis tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" tickFormatter={(v: number) => formatCurrency(v)} />
-              <Tooltip formatter={(value) => formatCurrency(Number(value))} contentStyle={{ borderRadius: "8px", border: "1px solid var(--border)", background: "var(--popover)" }} />
-              <Bar dataKey="savings" name="Savings" radius={[4, 4, 0, 0]}>
-                {monthlyData.map((entry, i) => (
-                  <Cell key={i} fill={entry.savings >= 0 ? "#10B981" : "#EF4444"} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Monthly Savings Rate */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Monthly Savings</CardTitle>
+            <CardDescription>Net savings each month (income - expenses)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" />
+                <YAxis tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" tickFormatter={(v: number) => formatCurrency(v)} />
+                <Tooltip formatter={(value) => formatCurrency(Number(value))} contentStyle={{ borderRadius: "8px", border: "1px solid var(--border)", background: "var(--popover)" }} />
+                <Bar dataKey="savings" name="Savings" radius={[4, 4, 0, 0]}>
+                  {monthlyData.map((entry, i) => (
+                    <Cell key={i} fill={entry.savings >= 0 ? "#10B981" : "#EF4444"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Monthly Savings Rate % */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Savings Rate</CardTitle>
+            <CardDescription>Percentage of income saved each month</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart data={monthlyData.map((m) => ({ ...m, rate: m.income > 0 ? ((m.savings / m.income) * 100) : 0 }))}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" />
+                <YAxis tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" tickFormatter={(v: number) => `${v.toFixed(0)}%`} />
+                <Tooltip formatter={(value) => `${Number(value).toFixed(1)}%`} contentStyle={{ borderRadius: "8px", border: "1px solid var(--border)", background: "var(--popover)" }} />
+                <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
+                <Line type="monotone" dataKey="rate" name="Savings Rate" stroke="#8B5CF6" strokeWidth={2} dot={{ r: 3, fill: "#8B5CF6" }} activeDot={{ r: 5 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Category Table */}
       <Card>

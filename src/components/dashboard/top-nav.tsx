@@ -3,7 +3,8 @@
 import { signOut, useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Bell, Search, LogOut, User, Settings, Heart, ArrowLeftRight, Eye } from "lucide-react";
+import { Bell, LogOut, User, Settings, Heart, ArrowLeftRight, Eye } from "lucide-react";
+import { GlobalSearch } from "@/components/global-search";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -131,9 +132,7 @@ export function TopNav({ linkedPartner }: { linkedPartner?: LinkedPartner }) {
 
           <StreakBadge streak={user?.streak ?? 0} />
           <LevelBadge xp={user?.xp ?? 0} level={user?.level ?? 1} compact />
-          <Button variant="ghost" size="icon" className="hidden md:inline-flex text-muted-foreground hover:text-foreground">
-            <Search className="w-4 h-4" />
-          </Button>
+          <GlobalSearch />
           <Button variant="ghost" size="icon" className="hidden md:inline-flex text-muted-foreground hover:text-foreground">
             <Bell className="w-4 h-4" />
           </Button>

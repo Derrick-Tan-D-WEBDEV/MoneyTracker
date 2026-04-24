@@ -10,16 +10,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { User, Lock, Globe, Save, Loader2, Check, Heart, Copy, Link2, Unlink } from "lucide-react";
+import { User, Lock, Globe, Save, Loader2, Check, Heart, Copy, Link2, Unlink, Bell, BellOff, Send } from "lucide-react";
 import { getProfile, updateProfile, updatePassword } from "@/actions/settings";
 import { getCoupleLink, createInviteLink, acceptInviteLink, unlinkPartner } from "@/actions/couple";
+import {
+  getPushSubscriptionStatus,
+  sendDebtReminder,
+} from "@/actions/notifications";
+import {
+  isPushSupported,
+  subscribeToPush,
+  unsubscribeFromPush,
+} from "@/lib/notifications";
 import { SUPPORTED_CURRENCIES, DATE_FORMATS } from "@/lib/constants";
 import { getUserStats } from "@/actions/gamification";
 import { LevelBadge } from "@/components/dashboard/level-badge";
 import { StreakBadge } from "@/components/dashboard/streak-badge";
 import { toast } from "sonner";
 
-type Tab = "profile" | "security" | "preferences" | "couple";
+type Tab = "profile" | "security" | "preferences" | "couple" | "notifications";
 
 export default function SettingsPage() {
   const { data: session, update: updateSession } = useSession();
@@ -54,6 +63,11 @@ export default function SettingsPage() {
   const [inviteInput, setInviteInput] = useState("");
   const [copiedCode, setCopiedCode] = useState(false);
 
+  // Notifications state
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission>("default");
+
   useEffect(() => {
     getProfile().then((profile) => {
       setName(profile.name || "");
@@ -63,6 +77,11 @@ export default function SettingsPage() {
     });
     getUserStats().then((s) => setStats(s));
     getCoupleLink().then((link) => setCoupleLink(link));
+    setPushSupported(isPushSupported());
+    getPushSubscriptionStatus().then((status) => setNotificationsEnabled(status.enabled));
+    if (typeof Notification !== "undefined") {
+      setPushPermission(Notification.permission);
+    }
   }, []);
 
   const initials = user?.name
@@ -161,6 +180,7 @@ export default function SettingsPage() {
     { key: "profile", label: "Profile", icon: <User className="w-4 h-4" /> },
     { key: "security", label: "Security", icon: <Lock className="w-4 h-4" /> },
     { key: "preferences", label: "Preferences", icon: <Globe className="w-4 h-4" /> },
+    { key: "notifications", label: "Notifications", icon: <Bell className="w-4 h-4" /> },
     { key: "couple", label: "Couple", icon: <Heart className="w-4 h-4" /> },
   ];
 
@@ -319,6 +339,109 @@ export default function SettingsPage() {
                 Save Preferences
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Notifications Tab */}
+      {tab === "notifications" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Bell className="w-4 h-4 text-amber-500" />
+              Push Notifications
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!pushSupported ? (
+              <div className="p-4 rounded-lg bg-muted/50 text-sm text-muted-foreground">
+                Push notifications are not supported in this browser.
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Debt Payoff Reminders</p>
+                    <p className="text-sm text-muted-foreground">
+                      Get smart reminders about your debt payoff progress
+                    </p>
+                  </div>
+                  <Button
+                    variant={notificationsEnabled ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      startTransition(async () => {
+                        if (notificationsEnabled) {
+                          await unsubscribeFromPush();
+                          setNotificationsEnabled(false);
+                          toast.success("Notifications disabled");
+                        } else {
+                          const sub = await subscribeToPush();
+                          if (sub) {
+                            setNotificationsEnabled(true);
+                            setPushPermission("granted");
+                            toast.success("Notifications enabled!");
+                          } else {
+                            toast.error("Permission denied or subscription failed");
+                            setPushPermission(Notification.permission);
+                          }
+                        }
+                      });
+                    }}
+                    disabled={pending}
+                  >
+                    {pending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : notificationsEnabled ? (
+                      <>
+                        <BellOff className="w-4 h-4 mr-1" /> Disable
+                      </>
+                    ) : (
+                      <>
+                        <Bell className="w-4 h-4 mr-1" /> Enable
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                <div className="p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground">
+                  <p>Permission status: <strong className="capitalize">{pushPermission}</strong></p>
+                  {pushPermission === "denied" && (
+                    <p className="mt-1 text-red-500">
+                      You have blocked notifications. Please enable them in your browser settings.
+                    </p>
+                  )}
+                </div>
+
+                {notificationsEnabled && (
+                  <div className="pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => {
+                        startTransition(async () => {
+                          try {
+                            const result = await sendDebtReminder();
+                            if (result.sent) {
+                              toast.success("Test notification sent!");
+                            } else {
+                              toast.error("Could not send test notification");
+                            }
+                          } catch {
+                            toast.error("Failed to send test notification");
+                          }
+                        });
+                      }}
+                      disabled={pending}
+                    >
+                      {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      Send Test Notification
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
       )}

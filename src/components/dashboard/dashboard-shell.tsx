@@ -33,8 +33,46 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         processRecurringTransactions().catch(() => {});
         // Update daily login streak, then refresh session so streak badge updates
         updateStreak()
-          .then(() => updateSession())
+          .then((streakResult) => {
+            // Fire any streak achievements
+            if (streakResult?.newAchievements?.length) {
+              streakResult.newAchievements.forEach((key, i) => {
+                setTimeout(() => handleAchievement(key), i * 600);
+              });
+            }
+            return updateSession();
+          })
           .catch(() => {});
+
+        // Check net worth milestones
+        import("@/actions/gamification")
+          .then(({ checkNetWorthAchievements }) => checkNetWorthAchievements())
+          .then((nwAchievements) => {
+            if (nwAchievements.length) {
+              nwAchievements.forEach((key, i) => {
+                setTimeout(() => handleAchievement(key), i * 600);
+              });
+            }
+          })
+          .catch(() => {});
+
+        // Send smart debt reminder (throttled: max once per 3 days)
+        try {
+          const lastReminder = localStorage.getItem("mt_last_debt_reminder");
+          const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+          if (!lastReminder || parseInt(lastReminder) < threeDaysAgo) {
+            import("@/actions/notifications")
+              .then(({ sendDebtReminder }) => sendDebtReminder())
+              .then((result) => {
+                if (result.sent) {
+                  localStorage.setItem("mt_last_debt_reminder", String(Date.now()));
+                }
+              })
+              .catch(() => {});
+          }
+        } catch {
+          // localStorage may be unavailable
+        }
       } catch {
         // Not critical - FAB just won't show
       }

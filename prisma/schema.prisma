@@ -46,6 +46,7 @@ model User {
   coupleLinksAsUser    CoupleLink[] @relation("CoupleLinkUser")
   coupleLinksAsPartner CoupleLink[] @relation("CoupleLinkPartner")
   assets            Asset[]
+  pushSubscriptions PushSubscription[]
 }
 
 model Account {
@@ -65,6 +66,7 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
@@ -74,6 +76,8 @@ model Session {
   expires      DateTime
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model VerificationToken {
@@ -288,6 +292,8 @@ model RecurringRule {
   createdAt     DateTime            @default(now())
 
   transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([transactionId])
 }
 
 // ─── Debts / Loans ─────────────────────────────────────────────────
@@ -405,6 +411,7 @@ model NetWorthSnapshot {
 
   @@unique([userId, date])
   @@index([userId])
+  @@index([userId, date])
 }
 
 // ─── Subscriptions ─────────────────────────────────────────────────
@@ -509,4 +516,17 @@ model CoupleLink {
   @@index([userId])
   @@index([partnerId])
   @@index([inviteCode])
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  endpoint  String   @db.Text
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

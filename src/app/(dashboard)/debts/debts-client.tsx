@@ -10,7 +10,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Landmark, Car, Home, GraduationCap, CreditCard, HeartPulse, CircleDollarSign, Trash2, BadgeCheck, Banknote, CalendarDays, Percent, TrendingDown, Pencil } from "lucide-react";
+import { Plus, Landmark, Car, Home, GraduationCap, CreditCard, HeartPulse, CircleDollarSign, Trash2, BadgeCheck, Banknote, CalendarDays, Percent, TrendingDown, Pencil, Calculator } from "lucide-react";
+import { DebtPayoffCalculator } from "@/components/debt-payoff-calculator";
 import { usePartnerView } from "@/hooks/use-partner-view";
 import { getDebts, createDebt, updateDebt, makePayment, deleteDebt } from "@/actions/debts";
 import { getAccounts } from "@/actions/accounts";
@@ -699,6 +700,24 @@ export function DebtsClient() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Payoff Calculator */}
+      {activeDebts.length > 0 && (
+        <div className="mb-2">
+          <DebtPayoffCalculator
+            debts={activeDebts.map((d) => ({
+              id: d.id,
+              name: d.name,
+              type: d.type,
+              remainingAmount: d.remainingAmount,
+              interestRate: d.interestRate,
+              minimumPayment: d.minimumPayment,
+              currency: d.currency,
+              color: d.color,
+            }))}
+          />
+        </div>
+      )}
 
       {/* Active Debts */}
       {debts.length === 0 ? (
