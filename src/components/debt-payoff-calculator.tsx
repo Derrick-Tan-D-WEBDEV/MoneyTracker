@@ -453,13 +453,37 @@ export function DebtPayoffCalculator({ debts, rates }: DebtPayoffCalculatorProps
                       tickFormatter={(v: number) => formatCurrency(v)}
                     />
                     <Tooltip
-                      formatter={(value, name) => {
-                        const label = name === "avalanche" ? "Avalanche" : name === "snowball" ? "Snowball" : "Custom";
-                        return [formatCurrency(Number(value)), label];
+                      content={({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null;
+                        const labelMap: Record<string, string> = {
+                          avalanche: "Avalanche",
+                          snowball: "Snowball",
+                          custom: "Custom",
+                        };
+                        const colorMap: Record<string, string> = {
+                          avalanche: "#3B82F6",
+                          snowball: "#10B981",
+                          custom: "#F59E0B",
+                        };
+                        return (
+                          <div className="rounded-lg border bg-popover p-2.5 shadow-sm">
+                            <p className="text-xs text-muted-foreground mb-1">{label}</p>
+                            {payload.map((entry) => {
+                              const key = entry.dataKey as string;
+                              if (!labelMap[key]) return null;
+                              return (
+                                <p key={key} className="text-xs" style={{ color: colorMap[key] }}>
+                                  <span className="font-medium">{labelMap[key]}:</span>{" "}
+                                  {formatCurrency(Number(entry.value))}
+                                </p>
+                              );
+                            })}
+                          </div>
+                        );
                       }}
-                      contentStyle={{ borderRadius: "8px", border: "1px solid var(--border)", background: "var(--popover)" }}
                     />
                     <Area
+                      key="avalanche"
                       type="monotone"
                       dataKey="avalanche"
                       name="Avalanche"
@@ -470,6 +494,7 @@ export function DebtPayoffCalculator({ debts, rates }: DebtPayoffCalculatorProps
                       strokeDasharray="4 4"
                     />
                     <Area
+                      key="snowball"
                       type="monotone"
                       dataKey="snowball"
                       name="Snowball"
@@ -480,6 +505,7 @@ export function DebtPayoffCalculator({ debts, rates }: DebtPayoffCalculatorProps
                     />
                     {strategy === "custom" && (
                       <Area
+                        key="custom"
                         type="monotone"
                         dataKey="custom"
                         name="Custom"
