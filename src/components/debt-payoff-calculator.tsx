@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,7 +59,9 @@ export function DebtPayoffCalculator({ debts }: DebtPayoffCalculatorProps) {
   const userCurrency = session?.user?.currency || "MYR";
   const formatCurrency = currencyFormatter(userCurrency);
 
-  const activeDebts = debts.filter((d) => d.remainingAmount > 0);
+  // Stabilize activeDebts so useMemo deps below actually memoize
+  const debtKey = debts.map((d) => `${d.id}:${d.remainingAmount}`).join(",");
+  const activeDebts = useMemo(() => debts.filter((d) => d.remainingAmount > 0), [debtKey]);
   const totalOwed = activeDebts.reduce((s, d) => s + d.remainingAmount, 0);
   const totalMinPayment = calculateMinimumTotalPayment(activeDebts);
 
@@ -67,15 +69,24 @@ export function DebtPayoffCalculator({ debts }: DebtPayoffCalculatorProps) {
   const [strategy, setStrategy] = useState<"avalanche" | "snowball" | "custom">("avalanche");
   const [customOrder, setCustomOrder] = useState<string[]>(() => activeDebts.map((d) => d.id));
 
-  // Keep customOrder in sync if debts change
+  // Keep customOrder in sync if debts change (use primitive dep to avoid infinite loop)
+  const activeDebtIdsKey = activeDebts.map((d) => d.id).join(",");
+  const prevDebtIdsKeyRef = useRef(activeDebtIdsKey);
   useEffect(() => {
+    if (prevDebtIdsKeyRef.current === activeDebtIdsKey) return;
+    prevDebtIdsKeyRef.current = activeDebtIdsKey;
     const activeIds = new Set(activeDebts.map((d) => d.id));
     setCustomOrder((prev) => {
       const filtered = prev.filter((id) => activeIds.has(id));
       const missing = activeDebts.filter((d) => !filtered.includes(d.id)).map((d) => d.id);
-      return [...filtered, ...missing];
+      const next = [...filtered, ...missing];
+      // Bail out if order hasn't changed to prevent infinite loop
+      if (next.length === prev.length && next.every((id, i) => id === prev[i])) {
+        return prev;
+      }
+      return next;
     });
-  }, [activeDebts]);
+  }, [activeDebtIdsKey, activeDebts]);
 
   const comparison = useMemo(() => {
     if (activeDebts.length === 0) return null;

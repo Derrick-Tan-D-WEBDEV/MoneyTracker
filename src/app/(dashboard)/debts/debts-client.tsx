@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -264,8 +264,8 @@ export function DebtsClient() {
   };
 
   // Stats (converted to user currency for aggregates)
-  const activeDebts = debts.filter((d) => !d.isPaidOff);
-  const paidOffDebts = debts.filter((d) => d.isPaidOff);
+  const activeDebts = useMemo(() => debts.filter((d) => !d.isPaidOff), [debts]);
+  const paidOffDebts = useMemo(() => debts.filter((d) => d.isPaidOff), [debts]);
   const toUser = (amount: number, from: string) => convertCurrency(amount, from, userCurrency, rates);
   const totalOwed = activeDebts.reduce((sum, d) => sum + toUser(d.remainingAmount, d.currency), 0);
   const totalOriginal = activeDebts.reduce((sum, d) => sum + toUser(d.originalAmount, d.currency), 0);
@@ -273,6 +273,17 @@ export function DebtsClient() {
   const overallProgress = totalOriginal > 0 ? (totalPaid / totalOriginal) * 100 : 0;
   const totalMinPayment = activeDebts.reduce((sum, d) => sum + toUser(d.minimumPayment, d.currency), 0);
   const hasMultipleCurrencies = new Set(activeDebts.map((d) => d.currency)).size > 1;
+
+  const calculatorDebts = useMemo(() => activeDebts.map((d) => ({
+    id: d.id,
+    name: d.name,
+    type: d.type,
+    remainingAmount: d.remainingAmount,
+    interestRate: d.interestRate,
+    minimumPayment: d.minimumPayment,
+    currency: d.currency,
+    color: d.color,
+  })), [activeDebts]);
 
   if (loading) {
     return (
@@ -704,18 +715,7 @@ export function DebtsClient() {
       {/* Payoff Calculator */}
       {activeDebts.length > 0 && (
         <div className="mb-2">
-          <DebtPayoffCalculator
-            debts={activeDebts.map((d) => ({
-              id: d.id,
-              name: d.name,
-              type: d.type,
-              remainingAmount: d.remainingAmount,
-              interestRate: d.interestRate,
-              minimumPayment: d.minimumPayment,
-              currency: d.currency,
-              color: d.color,
-            }))}
-          />
+          <DebtPayoffCalculator debts={calculatorDebts} />
         </div>
       )}
 
