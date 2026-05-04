@@ -547,7 +547,14 @@ export function CardsClient() {
               <Label>Set</Label>
               <Select value={selectedSet} onValueChange={(v) => setSelectedSet(v ?? "")}>
                 <SelectTrigger className="w-64">
-                  <SelectValue placeholder={sets.length === 0 ? "No sets — sync catalog first" : "Select a set"} />
+                  <SelectValue>
+                    {(value: string) => {
+                      if (!value) return sets.length === 0 ? "No sets — sync catalog first" : "Select a set";
+                      if (value === ALL_SETS) return "All sets (search only)";
+                      const s = sets.find((x) => x.code === value);
+                      return s ? `${s.name} (${s.count})` : value;
+                    }}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL_SETS}>All sets (search only)</SelectItem>
