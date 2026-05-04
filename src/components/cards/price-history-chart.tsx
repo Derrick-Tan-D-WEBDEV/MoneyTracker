@@ -26,8 +26,8 @@ export function PriceHistoryChart({ data }: Props) {
           <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(d: string) => d.slice(5)} />
           <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `$${v.toFixed(2)}`} />
           <Tooltip
-            formatter={(v: number) => `$${v.toFixed(2)}`}
-            labelFormatter={(l: string) => l}
+            formatter={(v) => (typeof v === "number" ? `$${v.toFixed(2)}` : String(v ?? ""))}
+            labelFormatter={(l) => String(l ?? "")}
             contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
           />
           <Legend wrapperStyle={{ fontSize: 12 }} />

@@ -495,7 +495,7 @@ export function CardsClient() {
           <div className="flex flex-wrap gap-3 items-end">
             <div className="space-y-1">
               <Label>Set</Label>
-              <Select value={selectedSet} onValueChange={setSelectedSet}>
+              <Select value={selectedSet} onValueChange={(v) => setSelectedSet(v ?? "")}>
                 <SelectTrigger className="w-64">
                   <SelectValue placeholder={sets.length === 0 ? "No sets — sync catalog first" : "Select a set"} />
                 </SelectTrigger>
@@ -693,7 +693,7 @@ export function CardsClient() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>Finish</Label>
-                  <Select value={formFinish} onValueChange={(v) => setFormFinish(v as Finish)}>
+                  <Select value={formFinish} onValueChange={(v) => setFormFinish((v ?? "NORMAL") as Finish)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -708,7 +708,7 @@ export function CardsClient() {
                 </div>
                 <div className="space-y-1">
                   <Label>Condition</Label>
-                  <Select value={formCondition} onValueChange={(v) => setFormCondition(v as Condition)}>
+                  <Select value={formCondition} onValueChange={(v) => setFormCondition((v ?? "NM") as Condition)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -757,7 +757,7 @@ export function CardsClient() {
               <p className="text-sm font-medium">{fullName(wishCard)}</p>
               <div className="space-y-1">
                 <Label>Finish</Label>
-                <Select value={wishFinish} onValueChange={(v) => setWishFinish(v as Finish)}>
+                <Select value={wishFinish} onValueChange={(v) => setWishFinish((v ?? "NORMAL") as Finish)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
