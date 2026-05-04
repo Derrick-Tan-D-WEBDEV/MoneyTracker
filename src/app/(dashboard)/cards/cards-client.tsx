@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
-import { Plus, RefreshCw, Trash2, Pencil, Search, Heart, Upload, Layers, Sparkles, ImageOff, ArrowDownToLine } from "lucide-react";
+import { Plus, RefreshCw, Trash2, Pencil, Search, Heart, Upload, Layers, Sparkles, ImageOff, ArrowDownToLine, SlidersHorizontal, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 
 import { usePartnerView } from "@/hooks/use-partner-view";
@@ -77,6 +78,14 @@ export function CardsClient() {
   const [browseCards, setBrowseCards] = useState<CatalogCard[]>([]);
   const [browseLoading, setBrowseLoading] = useState(false);
 
+  // Browse filter state (client-side over loaded results)
+  const ALL_SETS = "__all__";
+  const RARITY_OPTIONS = ["common", "uncommon", "rare", "super_rare", "legendary", "enchanted", "iconic", "epic", "promo"] as const;
+  const [filterRarities, setFilterRarities] = useState<string[]>([]);
+  const [filterMinPrice, setFilterMinPrice] = useState<string>("");
+  const [filterMaxPrice, setFilterMaxPrice] = useState<string>("");
+  const [filterHasPriceOnly, setFilterHasPriceOnly] = useState(false);
+
   // Add/edit dialog state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
@@ -115,7 +124,7 @@ export function CardsClient() {
       setWishlist(wish);
       setCatalogEmpty(isEmpty);
       setSets(setList);
-      if (setList.length > 0 && !selectedSet) setSelectedSet(setList[0].code);
+      if (setList.length > 0 && !selectedSet) setSelectedSet(ALL_SETS);
     } catch {
       toast.error("Failed to load cards");
     } finally {
@@ -128,22 +137,27 @@ export function CardsClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load cards when set changes
+  // Load cards when set changes (a specific set only — All-sets stays empty until a search runs)
   useEffect(() => {
-    if (!selectedSet) return;
+    if (!selectedSet || selectedSet === ALL_SETS) {
+      if (selectedSet === ALL_SETS && !browseSearch) setBrowseCards([]);
+      return;
+    }
     setBrowseLoading(true);
     listCardsInSet(selectedSet)
       .then(setBrowseCards)
       .finally(() => setBrowseLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSet]);
 
-  // Debounced search
+  // Debounced search (works globally when All-sets is selected)
   useEffect(() => {
     if (!browseSearch || browseSearch.trim().length < 2) return;
     const t = setTimeout(async () => {
       setBrowseLoading(true);
       try {
-        const res = await searchCatalog(browseSearch, { setCode: selectedSet || undefined });
+        const setCode = selectedSet && selectedSet !== ALL_SETS ? selectedSet : undefined;
+        const res = await searchCatalog(browseSearch, { setCode, limit: 200 });
         setBrowseCards(res);
       } finally {
         setBrowseLoading(false);
@@ -153,6 +167,30 @@ export function CardsClient() {
   }, [browseSearch, selectedSet]);
 
   const usdToUser = (usd: number) => convertCurrency(usd, "USD", userCurrency, rates);
+
+  // Apply client-side filters over loaded browseCards (rarity / price range / has-price)
+  const filteredBrowseCards = useMemo(() => {
+    const min = filterMinPrice.trim() ? parseFloat(filterMinPrice) : null;
+    const max = filterMaxPrice.trim() ? parseFloat(filterMaxPrice) : null;
+    return browseCards.filter((c) => {
+      if (filterRarities.length > 0) {
+        if (!c.rarity || !filterRarities.includes(c.rarity)) return false;
+      }
+      const price = c.priceUsd ?? c.priceUsdFoil ?? null;
+      if (filterHasPriceOnly && price == null) return false;
+      if (min != null && (price == null || price < min)) return false;
+      if (max != null && (price == null || price > max)) return false;
+      return true;
+    });
+  }, [browseCards, filterRarities, filterMinPrice, filterMaxPrice, filterHasPriceOnly]);
+  const activeFilterCount = (filterRarities.length > 0 ? 1 : 0) + (filterMinPrice ? 1 : 0) + (filterMaxPrice ? 1 : 0) + (filterHasPriceOnly ? 1 : 0);
+  const clearFilters = () => {
+    setFilterRarities([]);
+    setFilterMinPrice("");
+    setFilterMaxPrice("");
+    setFilterHasPriceOnly(false);
+  };
+  const toggleRarity = (r: string) => setFilterRarities((prev) => (prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]));
 
   const collectionTotalUsd = useMemo(() => collection.reduce((sum, c) => sum + (c.totalMarketUsd ?? 0), 0), [collection]);
   const collectionCostUsd = useMemo(() => collection.reduce((sum, c) => sum + (c.totalAcquiredCostUsd ?? c.acquiredPrice * c.quantity), 0), [collection]);
@@ -512,6 +550,7 @@ export function CardsClient() {
                   <SelectValue placeholder={sets.length === 0 ? "No sets — sync catalog first" : "Select a set"} />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={ALL_SETS}>All sets (search only)</SelectItem>
                   {sets.map((s) => (
                     <SelectItem key={s.code} value={s.code}>
                       {s.name} ({s.count})
@@ -524,9 +563,94 @@ export function CardsClient() {
               <Label>Search</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input placeholder="Card name…" value={browseSearch} onChange={(e) => setBrowseSearch(e.target.value)} className="pl-9" />
+                <Input
+                  placeholder={selectedSet === ALL_SETS ? "Search across all sets…" : "Card name…"}
+                  value={browseSearch}
+                  onChange={(e) => setBrowseSearch(e.target.value)}
+                  className="pl-9"
+                />
               </div>
             </div>
+            <Popover>
+              <PopoverTrigger render={<Button variant="outline" />}>
+                <SlidersHorizontal className="w-4 h-4 mr-2" />
+                Filters
+                {activeFilterCount > 0 && (
+                  <Badge variant="secondary" className="ml-2 h-5 px-1.5">
+                    {activeFilterCount}
+                  </Badge>
+                )}
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80 space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">Rarity</Label>
+                    {filterRarities.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setFilterRarities([])}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        clear
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {RARITY_OPTIONS.map((r) => {
+                      const active = filterRarities.includes(r);
+                      return (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => toggleRarity(r)}
+                          className={`text-xs px-2 py-1 rounded-md border capitalize transition-colors ${
+                            active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"
+                          }`}
+                        >
+                          {r.replace("_", " ")}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Price (USD)</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Min"
+                      value={filterMinPrice}
+                      onChange={(e) => setFilterMinPrice(e.target.value)}
+                    />
+                    <span className="text-muted-foreground text-xs">to</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Max"
+                      value={filterMaxPrice}
+                      onChange={(e) => setFilterMaxPrice(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={filterHasPriceOnly}
+                    onChange={(e) => setFilterHasPriceOnly(e.target.checked)}
+                    className="rounded border-input"
+                  />
+                  Only cards with a market price
+                </label>
+                {activeFilterCount > 0 && (
+                  <Button variant="ghost" size="sm" className="w-full" onClick={clearFilters}>
+                    <X className="w-3 h-3 mr-1" /> Clear all filters
+                  </Button>
+                )}
+              </PopoverContent>
+            </Popover>
           </div>
 
           {browseLoading ? (
@@ -535,11 +659,22 @@ export function CardsClient() {
                 <Skeleton key={i} className="h-72 rounded-lg" />
               ))}
             </div>
-          ) : browseCards.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">No cards. {catalogEmpty && "Sync the catalog above first."}</p>
+          ) : filteredBrowseCards.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">
+              {browseCards.length === 0
+                ? selectedSet === ALL_SETS
+                  ? "Type at least 2 characters in the search box to find cards across all sets."
+                  : `No cards. ${catalogEmpty ? "Sync the catalog above first." : ""}`
+                : "No cards match the current filters."}
+            </p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {browseCards.map((card) => (
+            <>
+              <p className="text-xs text-muted-foreground">
+                Showing {filteredBrowseCards.length}
+                {filteredBrowseCards.length !== browseCards.length && ` of ${browseCards.length}`} cards
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                {filteredBrowseCards.map((card) => (
                 <Card key={card.id} className="overflow-hidden group">
                   <button onClick={() => openHistory(card)} className="w-full block aspect-7/10 bg-muted relative">
                     {card.imageNormal ? (
@@ -578,7 +713,8 @@ export function CardsClient() {
                   </CardContent>
                 </Card>
               ))}
-            </div>
+              </div>
+            </>
           )}
         </TabsContent>
 

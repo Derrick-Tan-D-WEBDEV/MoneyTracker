@@ -119,7 +119,20 @@ export async function listSets(game: CardGame = CardGame.LORCANA): Promise<{ cod
     where: { game },
     _count: { _all: true },
   });
-  return grouped.map((g) => ({ code: g.setCode, name: g.setName, count: g._count._all })).sort((a, b) => a.code.localeCompare(b.code));
+  return grouped
+    .map((g) => ({ code: g.setCode, name: g.setName, count: g._count._all }))
+    .sort((a, b) => {
+      // Sort numerically when both codes parse cleanly (e.g. Lorcana chapters "1".."10"),
+      // otherwise fall back to lexicographic. Non-numeric codes are pushed to the end.
+      const an = Number(a.code);
+      const bn = Number(b.code);
+      const aNum = Number.isFinite(an) && /^\d+$/.test(a.code);
+      const bNum = Number.isFinite(bn) && /^\d+$/.test(b.code);
+      if (aNum && bNum) return an - bn;
+      if (aNum) return -1;
+      if (bNum) return 1;
+      return a.code.localeCompare(b.code);
+    });
 }
 
 /** List cards in a set. */
