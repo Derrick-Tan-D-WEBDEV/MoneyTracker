@@ -156,8 +156,15 @@ export async function listCardsInSet(setCode: string, game: CardGame = CardGame.
 export async function browseCatalog(opts: { query?: string; setCode?: string; rarities?: string[]; hasPriceOnly?: boolean; limit?: number }): Promise<CatalogCard[]> {
   const limit = Math.min(opts.limit ?? 200, 500);
   const trimmed = (opts.query ?? "").trim();
-  const where: Record<string, unknown> = { game: CardGame.LORCANA };
-  if (trimmed.length >= 2) where.name = { contains: trimmed, mode: "insensitive" };
+  const and: Record<string, unknown>[] = [];
+  const where: Record<string, unknown> = { game: CardGame.LORCANA, AND: and };
+  // Match either the card's name (e.g. "Mickey Mouse") or its subtitle/version
+  // (e.g. "True Friend") so users can search by either.
+  if (trimmed.length >= 2) {
+    and.push({
+      OR: [{ name: { contains: trimmed, mode: "insensitive" } }, { subtitle: { contains: trimmed, mode: "insensitive" } }],
+    });
+  }
   if (opts.setCode) where.setCode = opts.setCode;
   if (opts.rarities && opts.rarities.length > 0) {
     // Lorcast stores rarity proper-cased ("Common", "Super_rare", …). Match case-insensitively
@@ -173,7 +180,7 @@ export async function browseCatalog(opts: { query?: string; setCode?: string; ra
     where.rarity = { in: [...variants] };
   }
   if (opts.hasPriceOnly) {
-    where.OR = [{ priceUsd: { not: null } }, { priceUsdFoil: { not: null } }];
+    and.push({ OR: [{ priceUsd: { not: null } }, { priceUsdFoil: { not: null } }] });
   }
   const rows = await db.cardCatalog.findMany({
     where,
@@ -191,7 +198,7 @@ export async function searchCatalog(query: string, opts?: { setCode?: string; li
 
   const where: Record<string, unknown> = {
     game: CardGame.LORCANA,
-    name: { contains: trimmed, mode: "insensitive" },
+    OR: [{ name: { contains: trimmed, mode: "insensitive" } }, { subtitle: { contains: trimmed, mode: "insensitive" } }],
   };
   if (opts?.setCode) where.setCode = opts.setCode;
 
