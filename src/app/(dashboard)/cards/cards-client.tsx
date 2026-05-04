@@ -695,13 +695,20 @@ export function CardsClient() {
                       <p className="text-xs text-muted-foreground truncate">
                         #{card.cardNumber} · {card.rarity ?? "—"}
                       </p>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="font-semibold">{card.priceUsd != null ? formatCurrency(usdToUser(card.priceUsd)) : "—"}</span>
-                        {card.priceUsdFoil != null && (
-                          <span className="text-amber-500" title="Foil">
-                            {formatCurrency(usdToUser(card.priceUsdFoil))}★
-                          </span>
+                      <div className="flex flex-col gap-0.5 text-xs">
+                        {card.priceUsd != null && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Non-foil</span>
+                            <span className="font-semibold">{formatCurrency(usdToUser(card.priceUsd))}</span>
+                          </div>
                         )}
+                        {card.priceUsdFoil != null && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Foil</span>
+                            <span className="font-semibold text-amber-500">{formatCurrency(usdToUser(card.priceUsdFoil))}★</span>
+                          </div>
+                        )}
+                        {card.priceUsd == null && card.priceUsdFoil == null && <span className="text-muted-foreground">No price</span>}
                       </div>
                       {!isPartnerView && (
                         <div className="flex gap-1 pt-1">
