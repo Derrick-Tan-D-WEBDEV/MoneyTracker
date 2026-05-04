@@ -736,10 +736,14 @@ export function CardsClient() {
                 <div className="space-y-1">
                   <Label>Currency</Label>
                   <Select value={formAcquiredCurrency} onValueChange={(v) => setFormAcquiredCurrency(v ?? "USD")}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       {SUPPORTED_CURRENCIES.map((c) => (
-                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
