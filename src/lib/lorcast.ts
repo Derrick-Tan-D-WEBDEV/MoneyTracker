@@ -33,14 +33,16 @@ export interface LorcastCard {
   version?: string | null;
   collector_number: string;
   rarity?: string;
+  /** Ink cost (newer Lorcast field is `cost`; older docs called it `ink_cost`). */
+  cost?: number;
   ink_cost?: number;
-  type?: string[];
-  ink?: string;
-  set: { code: string; name: string };
+  type?: string[] | string;
+  ink?: string | null;
+  set: { code: string; name: string; id?: string };
   image_uris?: {
     digital?: { small?: string; normal?: string; large?: string };
   };
-  prices?: { usd?: string | null; usd_foil?: string | null };
+  prices?: { usd?: string | number | null; usd_foil?: string | number | null };
   tcgplayer_id?: number;
 }
 
@@ -94,16 +96,14 @@ export async function getAllSets(): Promise<LorcastSet[]> {
 }
 
 export async function getCardsBySetCode(code: string): Promise<LorcastCard[]> {
-  // Lorcast supports pagination; iterate until exhausted.
-  const cards: LorcastCard[] = [];
-  let url: string | null = `${API_BASE}/sets/${encodeURIComponent(code)}/cards`;
-  while (url) {
-    const data: ListResponse<LorcastCard> | null = await cachedFetch<ListResponse<LorcastCard>>(url);
-    if (!data) break;
-    cards.push(...(data.results ?? []));
-    url = data.has_more && data.next_page ? data.next_page : null;
-  }
-  return cards;
+  // Lorcast's /sets/:code/cards endpoint returns a PLAIN ARRAY of cards
+  // (not the wrapped {results, has_more, next_page} shape). Some legacy
+  // deployments may still return the wrapped form, so we accept both.
+  const url = `${API_BASE}/sets/${encodeURIComponent(code)}/cards`;
+  const data = await cachedFetch<LorcastCard[] | ListResponse<LorcastCard>>(url);
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  return data.results ?? [];
 }
 
 export async function searchCards(query: string): Promise<LorcastCard[]> {
@@ -119,9 +119,9 @@ export async function getCardById(id: string): Promise<LorcastCard | null> {
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
-export function parsePrice(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const n = parseFloat(value);
+export function parsePrice(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const n = typeof value === "number" ? value : parseFloat(value);
   if (!isFinite(n) || n < 0) return null;
   return n.toFixed(2);
 }

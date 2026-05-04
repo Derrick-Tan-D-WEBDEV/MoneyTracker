@@ -28,6 +28,8 @@ function startOfUtcDay(d = new Date()): Date {
 
 /** Map a Lorcast card → fields we persist in CardCatalog. */
 function mapCardToCatalog(card: LorcastCard) {
+  const ink = typeof card.cost === "number" ? card.cost : (typeof card.ink_cost === "number" ? card.ink_cost : null);
+  const cardType = Array.isArray(card.type) ? card.type.join(", ") : (typeof card.type === "string" ? card.type : null);
   return {
     game: CardGame.LORCANA,
     externalId: card.id,
@@ -37,8 +39,8 @@ function mapCardToCatalog(card: LorcastCard) {
     name: card.name,
     subtitle: card.version ?? null,
     rarity: card.rarity ?? null,
-    inkCost: typeof card.ink_cost === "number" ? card.ink_cost : null,
-    cardType: card.type?.join(", ") ?? null,
+    inkCost: ink,
+    cardType,
     ink: card.ink ?? null,
     imageSmall: card.image_uris?.digital?.small ?? null,
     imageNormal: card.image_uris?.digital?.normal ?? null,
