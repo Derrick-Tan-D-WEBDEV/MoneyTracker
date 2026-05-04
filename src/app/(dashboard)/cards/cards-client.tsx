@@ -563,12 +563,7 @@ export function CardsClient() {
               <Label>Search</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder={selectedSet === ALL_SETS ? "Search across all sets…" : "Card name…"}
-                  value={browseSearch}
-                  onChange={(e) => setBrowseSearch(e.target.value)}
-                  className="pl-9"
-                />
+                <Input placeholder={selectedSet === ALL_SETS ? "Search across all sets…" : "Card name…"} value={browseSearch} onChange={(e) => setBrowseSearch(e.target.value)} className="pl-9" />
               </div>
             </div>
             <Popover>
@@ -586,11 +581,7 @@ export function CardsClient() {
                   <div className="flex items-center justify-between">
                     <Label className="text-xs uppercase tracking-wide text-muted-foreground">Rarity</Label>
                     {filterRarities.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setFilterRarities([])}
-                        className="text-xs text-muted-foreground hover:text-foreground"
-                      >
+                      <button type="button" onClick={() => setFilterRarities([])} className="text-xs text-muted-foreground hover:text-foreground">
                         clear
                       </button>
                     )}
@@ -616,32 +607,13 @@ export function CardsClient() {
                 <div className="space-y-2">
                   <Label className="text-xs uppercase tracking-wide text-muted-foreground">Price (USD)</Label>
                   <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="Min"
-                      value={filterMinPrice}
-                      onChange={(e) => setFilterMinPrice(e.target.value)}
-                    />
+                    <Input type="number" min="0" step="0.01" placeholder="Min" value={filterMinPrice} onChange={(e) => setFilterMinPrice(e.target.value)} />
                     <span className="text-muted-foreground text-xs">to</span>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="Max"
-                      value={filterMaxPrice}
-                      onChange={(e) => setFilterMaxPrice(e.target.value)}
-                    />
+                    <Input type="number" min="0" step="0.01" placeholder="Max" value={filterMaxPrice} onChange={(e) => setFilterMaxPrice(e.target.value)} />
                   </div>
                 </div>
                 <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={filterHasPriceOnly}
-                    onChange={(e) => setFilterHasPriceOnly(e.target.checked)}
-                    className="rounded border-input"
-                  />
+                  <input type="checkbox" checked={filterHasPriceOnly} onChange={(e) => setFilterHasPriceOnly(e.target.checked)} className="rounded border-input" />
                   Only cards with a market price
                 </label>
                 {activeFilterCount > 0 && (
@@ -675,44 +647,44 @@ export function CardsClient() {
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                 {filteredBrowseCards.map((card) => (
-                <Card key={card.id} className="overflow-hidden group">
-                  <button onClick={() => openHistory(card)} className="w-full block aspect-7/10 bg-muted relative">
-                    {card.imageNormal ? (
-                      <Image src={card.imageNormal} alt={fullName(card)} fill sizes="(max-width: 768px) 50vw, 200px" className="object-cover group-hover:scale-105 transition-transform" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <ImageOff className="w-6 h-6 text-muted-foreground" />
-                      </div>
-                    )}
-                  </button>
-                  <CardContent className="p-2 space-y-1">
-                    <p className="text-xs font-medium truncate" title={fullName(card)}>
-                      {fullName(card)}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      #{card.cardNumber} · {card.rarity ?? "—"}
-                    </p>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-semibold">{card.priceUsd != null ? formatCurrency(usdToUser(card.priceUsd)) : "—"}</span>
-                      {card.priceUsdFoil != null && (
-                        <span className="text-amber-500" title="Foil">
-                          {formatCurrency(usdToUser(card.priceUsdFoil))}★
-                        </span>
+                  <Card key={card.id} className="overflow-hidden group">
+                    <button onClick={() => openHistory(card)} className="w-full block aspect-7/10 bg-muted relative">
+                      {card.imageNormal ? (
+                        <Image src={card.imageNormal} alt={fullName(card)} fill sizes="(max-width: 768px) 50vw, 200px" className="object-cover group-hover:scale-105 transition-transform" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <ImageOff className="w-6 h-6 text-muted-foreground" />
+                        </div>
                       )}
-                    </div>
-                    {!isPartnerView && (
-                      <div className="flex gap-1 pt-1">
-                        <Button size="sm" className="h-7 text-xs flex-1" onClick={() => openAddDialog(card)}>
-                          <Plus className="w-3 h-3 mr-1" /> Add
-                        </Button>
-                        <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => openWishDialog(card)} aria-label="Wishlist">
-                          <Heart className="w-3 h-3" />
-                        </Button>
+                    </button>
+                    <CardContent className="p-2 space-y-1">
+                      <p className="text-xs font-medium truncate" title={fullName(card)}>
+                        {fullName(card)}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        #{card.cardNumber} · {card.rarity ?? "—"}
+                      </p>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-semibold">{card.priceUsd != null ? formatCurrency(usdToUser(card.priceUsd)) : "—"}</span>
+                        {card.priceUsdFoil != null && (
+                          <span className="text-amber-500" title="Foil">
+                            {formatCurrency(usdToUser(card.priceUsdFoil))}★
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+                      {!isPartnerView && (
+                        <div className="flex gap-1 pt-1">
+                          <Button size="sm" className="h-7 text-xs flex-1" onClick={() => openAddDialog(card)}>
+                            <Plus className="w-3 h-3 mr-1" /> Add
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => openWishDialog(card)} aria-label="Wishlist">
+                            <Heart className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             </>
           )}
