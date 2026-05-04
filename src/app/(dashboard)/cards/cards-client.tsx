@@ -146,7 +146,6 @@ export function CardsClient() {
   useEffect(() => {
     const trimmed = browseSearch.trim();
     const hasSearch = trimmed.length >= 2;
-    const hasFilters = filterRarities.length > 0 || filterHasPriceOnly;
 
     // Specific set selected: load full set, then client-side filter via filteredBrowseCards
     if (selectedSet && selectedSet !== ALL_SETS && !hasSearch) {
@@ -157,13 +156,7 @@ export function CardsClient() {
       return;
     }
 
-    // All sets + nothing entered + no filters — stay empty
-    if (selectedSet === ALL_SETS && !hasSearch && !hasFilters) {
-      setBrowseCards([]);
-      return;
-    }
-
-    // Debounced server query (search and/or filters)
+    // Debounced server query (search and/or filters; All-sets with nothing set falls through here too and returns the first page of the catalog)
     const t = setTimeout(async () => {
       setBrowseLoading(true);
       try {
@@ -662,9 +655,9 @@ export function CardsClient() {
           ) : filteredBrowseCards.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">
               {browseCards.length === 0
-                ? selectedSet === ALL_SETS
-                  ? "Search across all sets, or open Filters to browse by rarity / price."
-                  : `No cards. ${catalogEmpty ? "Sync the catalog above first." : ""}`
+                ? catalogEmpty
+                  ? "Catalog is empty — sync the catalog above first."
+                  : "No cards found. Try a different set or search term."
                 : "No cards match the current filters."}
             </p>
           ) : (
