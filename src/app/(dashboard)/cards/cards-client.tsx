@@ -156,9 +156,12 @@ export function CardsClient() {
 
   const collectionTotalUsd = useMemo(() => collection.reduce((sum, c) => sum + (c.totalMarketUsd ?? 0), 0), [collection]);
   const collectionCostUsd = useMemo(() => collection.reduce((sum, c) => sum + (c.totalAcquiredCostUsd ?? c.acquiredPrice * c.quantity), 0), [collection]);
+  // Cost basis restricted to items that have a market price — used for fair gain/loss.
+  const pricedCostUsd = useMemo(() => collection.reduce((sum, c) => sum + (c.totalMarketUsd != null ? (c.totalAcquiredCostUsd ?? c.acquiredPrice * c.quantity) : 0), 0), [collection]);
+  const unpricedCount = useMemo(() => collection.filter((c) => c.totalMarketUsd == null).length, [collection]);
   const totalQuantity = useMemo(() => collection.reduce((s, c) => s + c.quantity, 0), [collection]);
-  const collectionGain = collectionTotalUsd - collectionCostUsd;
-  const collectionGainPct = collectionCostUsd > 0 ? (collectionGain / collectionCostUsd) * 100 : 0;
+  const collectionGain = collectionTotalUsd - pricedCostUsd;
+  const collectionGainPct = pricedCostUsd > 0 ? (collectionGain / pricedCostUsd) * 100 : 0;
 
   const handleSync = async () => {
     setSyncing(true);
@@ -411,6 +414,11 @@ export function CardsClient() {
               {collectionGain >= 0 ? "+" : ""}
               {collectionGainPct.toFixed(1)}%
             </p>
+            {unpricedCount > 0 && (
+              <p className="text-[10px] text-muted-foreground mt-1">
+                {unpricedCount} card{unpricedCount === 1 ? "" : "s"} excluded (no market price)
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -582,7 +590,8 @@ export function CardsClient() {
             </Card>
           ) : (
             wishlist.map((w) => {
-              const currentUsd = w.finish === "FOIL" ? w.catalog.priceUsdFoil : w.catalog.priceUsd;
+              const isFoilOnly = w.catalog.priceUsd == null && w.catalog.priceUsdFoil != null;
+              const currentUsd = isFoilOnly || w.finish === "FOIL" ? w.catalog.priceUsdFoil : w.catalog.priceUsd;
               const targetMet = w.targetMaxPrice != null && currentUsd != null && currentUsd <= w.targetMaxPrice;
               return (
                 <Card key={w.id}>

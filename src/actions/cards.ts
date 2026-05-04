@@ -231,7 +231,17 @@ export async function getCollection(): Promise<CollectionItem[]> {
     const acquiredPrice = decryptAmount(r.acquiredPrice, encKey);
     const acquiredPriceUsd = convertCurrency(acquiredPrice, r.currency || "USD", "USD", rates);
     const totalAcquiredCostUsd = acquiredPriceUsd * quantity;
-    const unitMarketUsd = r.finish === CardFinish.FOIL ? catalog.priceUsdFoil : r.finish === CardFinish.ENCHANTED ? (catalog.priceUsdFoil ?? catalog.priceUsd) : catalog.priceUsd;
+    // Enchanted / Iconic / Epic cards are foil-only specialty rarities — Lorcast typically only
+    // populates prices.usd_foil for them. If the catalog has no normal price, the foil price
+    // is the only meaningful market price regardless of the finish the user selected.
+    const isFoilOnlyCard = catalog.priceUsd == null && catalog.priceUsdFoil != null;
+    const unitMarketUsd = isFoilOnlyCard
+      ? catalog.priceUsdFoil
+      : r.finish === CardFinish.FOIL
+        ? (catalog.priceUsdFoil ?? catalog.priceUsd)
+        : r.finish === CardFinish.ENCHANTED
+          ? (catalog.priceUsdFoil ?? catalog.priceUsd)
+          : catalog.priceUsd;
     const totalMarketUsd = unitMarketUsd != null ? unitMarketUsd * quantity : null;
     const gainLossUsd = totalMarketUsd != null ? totalMarketUsd - totalAcquiredCostUsd : null;
     return {
