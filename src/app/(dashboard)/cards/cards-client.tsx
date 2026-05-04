@@ -107,13 +107,7 @@ export function CardsClient() {
 
   const refreshAll = async () => {
     try {
-      const [rateData, coll, wish, isEmpty, setList] = await Promise.all([
-        fetchExchangeRates(userCurrency),
-        getCollection(),
-        getCardWishlist(),
-        isCatalogEmpty(),
-        listSets(),
-      ]);
+      const [rateData, coll, wish, isEmpty, setList] = await Promise.all([fetchExchangeRates(userCurrency), getCollection(), getCardWishlist(), isCatalogEmpty(), listSets()]);
       setRates(rateData);
       setCollection(coll);
       setWishlist(wish);
@@ -158,14 +152,8 @@ export function CardsClient() {
 
   const usdToUser = (usd: number) => convertCurrency(usd, "USD", userCurrency, rates);
 
-  const collectionTotalUsd = useMemo(
-    () => collection.reduce((sum, c) => sum + (c.totalMarketUsd ?? 0), 0),
-    [collection],
-  );
-  const collectionCostUsd = useMemo(
-    () => collection.reduce((sum, c) => sum + c.acquiredPrice * c.quantity, 0),
-    [collection],
-  );
+  const collectionTotalUsd = useMemo(() => collection.reduce((sum, c) => sum + (c.totalMarketUsd ?? 0), 0), [collection]);
+  const collectionCostUsd = useMemo(() => collection.reduce((sum, c) => sum + c.acquiredPrice * c.quantity, 0), [collection]);
   const totalQuantity = useMemo(() => collection.reduce((s, c) => s + c.quantity, 0), [collection]);
   const collectionGain = collectionTotalUsd - collectionCostUsd;
   const collectionGainPct = collectionCostUsd > 0 ? (collectionGain / collectionCostUsd) * 100 : 0;
@@ -346,7 +334,9 @@ export function CardsClient() {
       <div className="space-y-6">
         <Skeleton className="h-8 w-48" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
         </div>
         <Skeleton className="h-96 rounded-xl" />
       </div>
@@ -395,7 +385,9 @@ export function CardsClient() {
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Collection value</p>
             <p className="text-2xl font-bold">{formatCurrency.format(usdToUser(collectionTotalUsd))}</p>
-            <p className="text-xs text-muted-foreground mt-1">{totalQuantity} cards · {collection.length} unique</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {totalQuantity} cards · {collection.length} unique
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -408,10 +400,12 @@ export function CardsClient() {
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Unrealized P/L</p>
             <p className={`text-2xl font-bold ${collectionGain >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-              {collectionGain >= 0 ? "+" : ""}{formatCurrency.format(usdToUser(collectionGain))}
+              {collectionGain >= 0 ? "+" : ""}
+              {formatCurrency.format(usdToUser(collectionGain))}
             </p>
             <p className={`text-xs mt-1 ${collectionGain >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-              {collectionGain >= 0 ? "+" : ""}{collectionGainPct.toFixed(1)}%
+              {collectionGain >= 0 ? "+" : ""}
+              {collectionGainPct.toFixed(1)}%
             </p>
           </CardContent>
         </Card>
@@ -445,13 +439,7 @@ export function CardsClient() {
                     <CardContent className="p-3 flex items-center gap-3">
                       <button onClick={() => openHistory(item.catalog)} className="shrink-0">
                         {item.catalog.imageSmall ? (
-                          <Image
-                            src={item.catalog.imageSmall}
-                            alt={fullName(item.catalog)}
-                            width={56}
-                            height={78}
-                            className="rounded-md object-cover hover:ring-2 hover:ring-purple-400"
-                          />
+                          <Image src={item.catalog.imageSmall} alt={fullName(item.catalog)} width={56} height={78} className="rounded-md object-cover hover:ring-2 hover:ring-purple-400" />
                         ) : (
                           <div className="w-14 h-19.5 rounded-md bg-muted flex items-center justify-center">
                             <ImageOff className="w-5 h-5 text-muted-foreground" />
@@ -467,19 +455,20 @@ export function CardsClient() {
                           <Badge variant="secondary">×{item.quantity}</Badge>
                           <Badge variant="outline">{item.finish}</Badge>
                           <Badge variant="outline">{item.condition}</Badge>
-                          {item.catalog.rarity && <Badge variant="outline" className="capitalize">{item.catalog.rarity.replace("_", " ")}</Badge>}
+                          {item.catalog.rarity && (
+                            <Badge variant="outline" className="capitalize">
+                              {item.catalog.rarity.replace("_", " ")}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="font-semibold">
-                          {totalUserCurr != null ? formatCurrency.format(totalUserCurr) : "—"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {unitUserCurr != null ? `${formatCurrency.format(unitUserCurr)} ea` : "no price"}
-                        </p>
+                        <p className="font-semibold">{totalUserCurr != null ? formatCurrency.format(totalUserCurr) : "—"}</p>
+                        <p className="text-xs text-muted-foreground">{unitUserCurr != null ? `${formatCurrency.format(unitUserCurr)} ea` : "no price"}</p>
                         {gain != null && (
                           <p className={`text-xs ${gain >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-                            {gain >= 0 ? "+" : ""}{formatCurrency.format(gain)}
+                            {gain >= 0 ? "+" : ""}
+                            {formatCurrency.format(gain)}
                           </p>
                         )}
                       </div>
@@ -523,19 +512,16 @@ export function CardsClient() {
               <Label>Search</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Card name…"
-                  value={browseSearch}
-                  onChange={(e) => setBrowseSearch(e.target.value)}
-                  className="pl-9"
-                />
+                <Input placeholder="Card name…" value={browseSearch} onChange={(e) => setBrowseSearch(e.target.value)} className="pl-9" />
               </div>
             </div>
           </div>
 
           {browseLoading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {[...Array(12)].map((_, i) => <Skeleton key={i} className="h-72 rounded-lg" />)}
+              {[...Array(12)].map((_, i) => (
+                <Skeleton key={i} className="h-72 rounded-lg" />
+              ))}
             </div>
           ) : browseCards.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">No cards. {catalogEmpty && "Sync the catalog above first."}</p>
@@ -545,24 +531,26 @@ export function CardsClient() {
                 <Card key={card.id} className="overflow-hidden group">
                   <button onClick={() => openHistory(card)} className="w-full block aspect-7/10 bg-muted relative">
                     {card.imageNormal ? (
-                      <Image
-                        src={card.imageNormal}
-                        alt={fullName(card)}
-                        fill
-                        sizes="(max-width: 768px) 50vw, 200px"
-                        className="object-cover group-hover:scale-105 transition-transform"
-                      />
+                      <Image src={card.imageNormal} alt={fullName(card)} fill sizes="(max-width: 768px) 50vw, 200px" className="object-cover group-hover:scale-105 transition-transform" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center"><ImageOff className="w-6 h-6 text-muted-foreground" /></div>
+                      <div className="w-full h-full flex items-center justify-center">
+                        <ImageOff className="w-6 h-6 text-muted-foreground" />
+                      </div>
                     )}
                   </button>
                   <CardContent className="p-2 space-y-1">
-                    <p className="text-xs font-medium truncate" title={fullName(card)}>{fullName(card)}</p>
-                    <p className="text-xs text-muted-foreground truncate">#{card.cardNumber} · {card.rarity ?? "—"}</p>
+                    <p className="text-xs font-medium truncate" title={fullName(card)}>
+                      {fullName(card)}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      #{card.cardNumber} · {card.rarity ?? "—"}
+                    </p>
                     <div className="flex justify-between items-center text-xs">
                       <span className="font-semibold">{card.priceUsd != null ? formatCurrency.format(usdToUser(card.priceUsd)) : "—"}</span>
                       {card.priceUsdFoil != null && (
-                        <span className="text-amber-500" title="Foil">{formatCurrency.format(usdToUser(card.priceUsdFoil))}★</span>
+                        <span className="text-amber-500" title="Foil">
+                          {formatCurrency.format(usdToUser(card.priceUsdFoil))}★
+                        </span>
                       )}
                     </div>
                     {!isPartnerView && (
@@ -585,7 +573,9 @@ export function CardsClient() {
         {/* WISHLIST */}
         <TabsContent value="wishlist" className="space-y-2 mt-2">
           {wishlist.length === 0 ? (
-            <Card><CardContent className="p-8 text-center text-muted-foreground">Your wishlist is empty. Add cards from the Browse tab.</CardContent></Card>
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">Your wishlist is empty. Add cards from the Browse tab.</CardContent>
+            </Card>
           ) : (
             wishlist.map((w) => {
               const currentUsd = w.finish === "FOIL" ? w.catalog.priceUsdFoil : w.catalog.priceUsd;
@@ -596,11 +586,15 @@ export function CardsClient() {
                     {w.catalog.imageSmall ? (
                       <Image src={w.catalog.imageSmall} alt={fullName(w.catalog)} width={56} height={78} className="rounded-md object-cover" />
                     ) : (
-                      <div className="w-14 h-19.5 rounded-md bg-muted flex items-center justify-center"><ImageOff className="w-5 h-5 text-muted-foreground" /></div>
+                      <div className="w-14 h-19.5 rounded-md bg-muted flex items-center justify-center">
+                        <ImageOff className="w-5 h-5 text-muted-foreground" />
+                      </div>
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{fullName(w.catalog)}</p>
-                      <p className="text-xs text-muted-foreground truncate">{w.catalog.setName} · #{w.catalog.cardNumber}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {w.catalog.setName} · #{w.catalog.cardNumber}
+                      </p>
                       <div className="flex gap-1 mt-1">
                         <Badge variant="outline">{w.finish}</Badge>
                         {targetMet && <Badge className="bg-emerald-500">Target met!</Badge>}
@@ -608,9 +602,7 @@ export function CardsClient() {
                     </div>
                     <div className="text-right text-sm">
                       <p>Now: {currentUsd != null ? formatCurrency.format(usdToUser(currentUsd)) : "—"}</p>
-                      {w.targetMaxPrice != null && (
-                        <p className="text-xs text-muted-foreground">Target ≤ {formatCurrency.format(usdToUser(w.targetMaxPrice))}</p>
-                      )}
+                      {w.targetMaxPrice != null && <p className="text-xs text-muted-foreground">Target ≤ {formatCurrency.format(usdToUser(w.targetMaxPrice))}</p>}
                     </div>
                     {!isPartnerView && (
                       <Button variant="ghost" size="icon" onClick={() => handleRemoveWishlist(w.id)} aria-label="Remove">
@@ -631,7 +623,8 @@ export function CardsClient() {
               <div>
                 <p className="font-medium">CSV format</p>
                 <p className="text-xs text-muted-foreground">
-                  Required columns: <code>set_code, card_number, quantity</code>. Optional: <code>finish (NORMAL/FOIL/ENCHANTED), condition (NM/LP/MP/HP/DMG), acquired_price, acquired_date, notes</code>.
+                  Required columns: <code>set_code, card_number, quantity</code>. Optional:{" "}
+                  <code>finish (NORMAL/FOIL/ENCHANTED), condition (NM/LP/MP/HP/DMG), acquired_price, acquired_date, notes</code>.
                 </p>
               </div>
               <Textarea
@@ -647,12 +640,16 @@ export function CardsClient() {
               </Button>
               {importResult && (
                 <div className="text-sm space-y-1">
-                  <p>Imported: <strong>{importResult.imported}</strong> · Skipped: <strong>{importResult.skipped}</strong></p>
+                  <p>
+                    Imported: <strong>{importResult.imported}</strong> · Skipped: <strong>{importResult.skipped}</strong>
+                  </p>
                   {importResult.errors.length > 0 && (
                     <details className="text-xs text-muted-foreground">
                       <summary>{importResult.errors.length} warnings</summary>
                       <ul className="list-disc pl-5 mt-1">
-                        {importResult.errors.slice(0, 20).map((err, i) => <li key={i}>{err}</li>)}
+                        {importResult.errors.slice(0, 20).map((err, i) => (
+                          <li key={i}>{err}</li>
+                        ))}
                       </ul>
                     </details>
                   )}
@@ -665,7 +662,11 @@ export function CardsClient() {
 
       <p className="text-xs text-muted-foreground text-center">
         <Sparkles className="inline w-3 h-3 mr-1" />
-        Card data &amp; prices courtesy of <a href="https://lorcast.com" target="_blank" rel="noopener" className="underline">Lorcast</a> (TCGPlayer market prices, USD).
+        Card data &amp; prices courtesy of{" "}
+        <a href="https://lorcast.com" target="_blank" rel="noopener" className="underline">
+          Lorcast
+        </a>{" "}
+        (TCGPlayer market prices, USD).
       </p>
 
       {/* Add/Edit dialog */}
@@ -677,12 +678,12 @@ export function CardsClient() {
           {pendingCard && (
             <form onSubmit={submitCollectionForm} className="space-y-3">
               <div className="flex gap-3 items-start">
-                {pendingCard.imageNormal && (
-                  <Image src={pendingCard.imageNormal} alt={fullName(pendingCard)} width={84} height={117} className="rounded-md" />
-                )}
+                {pendingCard.imageNormal && <Image src={pendingCard.imageNormal} alt={fullName(pendingCard)} width={84} height={117} className="rounded-md" />}
                 <div className="text-sm">
                   <p className="font-medium">{fullName(pendingCard)}</p>
-                  <p className="text-xs text-muted-foreground">{pendingCard.setName} · #{pendingCard.cardNumber}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {pendingCard.setName} · #{pendingCard.cardNumber}
+                  </p>
                   <p className="text-xs mt-1">
                     Market: {pendingCard.priceUsd != null ? `$${pendingCard.priceUsd.toFixed(2)}` : "—"}
                     {pendingCard.priceUsdFoil != null && ` · Foil $${pendingCard.priceUsdFoil.toFixed(2)}`}
@@ -693,18 +694,30 @@ export function CardsClient() {
                 <div className="space-y-1">
                   <Label>Finish</Label>
                   <Select value={formFinish} onValueChange={(v) => setFormFinish(v as Finish)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
-                      {FINISH_OPTIONS.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                      {FINISH_OPTIONS.map((f) => (
+                        <SelectItem key={f} value={f}>
+                          {f}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1">
                   <Label>Condition</Label>
                   <Select value={formCondition} onValueChange={(v) => setFormCondition(v as Condition)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
-                      {CONDITION_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      {CONDITION_OPTIONS.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -725,7 +738,9 @@ export function CardsClient() {
                   <Textarea rows={2} value={formNotes} onChange={(e) => setFormNotes(e.target.value)} />
                 </div>
               </div>
-              <Button type="submit" className="w-full">{editingCollectionId ? "Save" : "Add"}</Button>
+              <Button type="submit" className="w-full">
+                {editingCollectionId ? "Save" : "Add"}
+              </Button>
             </form>
           )}
         </DialogContent>
@@ -734,16 +749,24 @@ export function CardsClient() {
       {/* Wishlist dialog */}
       <Dialog open={wishDialogOpen} onOpenChange={setWishDialogOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add to wishlist</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Add to wishlist</DialogTitle>
+          </DialogHeader>
           {wishCard && (
             <form onSubmit={submitWishlist} className="space-y-3">
               <p className="text-sm font-medium">{fullName(wishCard)}</p>
               <div className="space-y-1">
                 <Label>Finish</Label>
                 <Select value={wishFinish} onValueChange={(v) => setWishFinish(v as Finish)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {FINISH_OPTIONS.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                    {FINISH_OPTIONS.map((f) => (
+                      <SelectItem key={f} value={f}>
+                        {f}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -755,7 +778,9 @@ export function CardsClient() {
                 <Label>Notes</Label>
                 <Textarea rows={2} value={wishNotes} onChange={(e) => setWishNotes(e.target.value)} />
               </div>
-              <Button type="submit" className="w-full">Add</Button>
+              <Button type="submit" className="w-full">
+                Add
+              </Button>
             </form>
           )}
         </DialogContent>
@@ -770,20 +795,35 @@ export function CardsClient() {
           {historyCard && (
             <div className="space-y-3">
               <div className="flex gap-3 items-start">
-                {historyCard.imageNormal && (
-                  <Image src={historyCard.imageNormal} alt={fullName(historyCard)} width={120} height={167} className="rounded-md" />
-                )}
+                {historyCard.imageNormal && <Image src={historyCard.imageNormal} alt={fullName(historyCard)} width={120} height={167} className="rounded-md" />}
                 <div className="text-sm space-y-1">
-                  <p>{historyCard.setName} · #{historyCard.cardNumber}</p>
-                  <p className="text-muted-foreground">{historyCard.rarity ?? ""} {historyCard.cardType ? `· ${historyCard.cardType}` : ""}</p>
+                  <p>
+                    {historyCard.setName} · #{historyCard.cardNumber}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {historyCard.rarity ?? ""} {historyCard.cardType ? `· ${historyCard.cardType}` : ""}
+                  </p>
                   <p>Normal: {historyCard.priceUsd != null ? `$${historyCard.priceUsd.toFixed(2)}` : "—"}</p>
                   {historyCard.priceUsdFoil != null && <p>Foil: ${historyCard.priceUsdFoil.toFixed(2)}</p>}
                   {!isPartnerView && (
                     <div className="flex gap-2 pt-1">
-                      <Button size="sm" onClick={() => { setHistoryOpen(false); openAddDialog(historyCard); }}>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setHistoryOpen(false);
+                          openAddDialog(historyCard);
+                        }}
+                      >
                         <Plus className="w-3 h-3 mr-1" /> Add to collection
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => { setHistoryOpen(false); openWishDialog(historyCard); }}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setHistoryOpen(false);
+                          openWishDialog(historyCard);
+                        }}
+                      >
                         <Heart className="w-3 h-3 mr-1" /> Wishlist
                       </Button>
                     </div>

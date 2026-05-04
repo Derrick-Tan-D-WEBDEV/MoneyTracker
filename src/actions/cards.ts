@@ -58,10 +58,22 @@ export type CatalogCard = {
 };
 
 function toCatalogCard(row: {
-  id: string; externalId: string; setCode: string; setName: string; cardNumber: string;
-  name: string; subtitle: string | null; rarity: string | null; inkCost: number | null;
-  cardType: string | null; ink: string | null; imageSmall: string | null; imageNormal: string | null;
-  priceUsd: string | null; priceUsdFoil: string | null; lastPricedAt: Date | null;
+  id: string;
+  externalId: string;
+  setCode: string;
+  setName: string;
+  cardNumber: string;
+  name: string;
+  subtitle: string | null;
+  rarity: string | null;
+  inkCost: number | null;
+  cardType: string | null;
+  ink: string | null;
+  imageSmall: string | null;
+  imageNormal: string | null;
+  priceUsd: string | null;
+  priceUsdFoil: string | null;
+  lastPricedAt: Date | null;
 }): CatalogCard {
   return {
     id: row.id,
@@ -106,9 +118,7 @@ export async function listSets(game: CardGame = CardGame.LORCANA): Promise<{ cod
     where: { game },
     _count: { _all: true },
   });
-  return grouped
-    .map((g) => ({ code: g.setCode, name: g.setName, count: g._count._all }))
-    .sort((a, b) => a.code.localeCompare(b.code));
+  return grouped.map((g) => ({ code: g.setCode, name: g.setName, count: g._count._all })).sort((a, b) => a.code.localeCompare(b.code));
 }
 
 /** List cards in a set. */
@@ -213,10 +223,7 @@ export async function getCollection(): Promise<CollectionItem[]> {
     const catalog = toCatalogCard(r.catalog);
     const quantity = decryptAmount(r.quantity, encKey);
     const acquiredPrice = decryptAmount(r.acquiredPrice, encKey);
-    const unitMarketUsd =
-      r.finish === CardFinish.FOIL ? catalog.priceUsdFoil :
-      r.finish === CardFinish.ENCHANTED ? (catalog.priceUsdFoil ?? catalog.priceUsd) :
-      catalog.priceUsd;
+    const unitMarketUsd = r.finish === CardFinish.FOIL ? catalog.priceUsdFoil : r.finish === CardFinish.ENCHANTED ? (catalog.priceUsdFoil ?? catalog.priceUsd) : catalog.priceUsd;
     const totalMarketUsd = unitMarketUsd != null ? unitMarketUsd * quantity : null;
     const gainLossUsd = totalMarketUsd != null ? totalMarketUsd - acquiredPrice * quantity : null;
     return {

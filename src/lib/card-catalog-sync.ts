@@ -115,9 +115,7 @@ export async function syncLorcanaCatalog(): Promise<SyncResult> {
 export async function refreshLorcanaPrices(opts?: { userId?: string }): Promise<SyncResult> {
   const result: SyncResult = { setsProcessed: 0, cardsUpserted: 0, pricesRecorded: 0, errors: [] };
 
-  const where = opts?.userId
-    ? { game: CardGame.LORCANA, collectionItems: { some: { userId: opts.userId } } }
-    : { game: CardGame.LORCANA };
+  const where = opts?.userId ? { game: CardGame.LORCANA, collectionItems: { some: { userId: opts.userId } } } : { game: CardGame.LORCANA };
 
   const rows = await db.cardCatalog.findMany({ where, select: { id: true, externalId: true } });
   if (rows.length === 0) return result;

@@ -2,15 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import {
-  CommandDialog,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-  CommandSeparator,
-} from "@/components/ui/command";
+import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandSeparator } from "@/components/ui/command";
 import { globalSearch, type SearchResult } from "@/actions/search";
 import {
   LayoutDashboard,
@@ -148,18 +140,7 @@ export function GlobalSearch() {
     {} as Record<string, SearchResult[]>,
   );
 
-  const groupOrder = [
-    "Pages",
-    "Transactions",
-    "Accounts",
-    "Categories",
-    "Goals",
-    "Investments",
-    "Debts",
-    "Subscriptions",
-    "Assets",
-    "Wishlist",
-  ];
+  const groupOrder = ["Pages", "Transactions", "Accounts", "Categories", "Goals", "Investments", "Debts", "Subscriptions", "Assets", "Wishlist"];
 
   return (
     <>
@@ -181,21 +162,11 @@ export function GlobalSearch() {
       </button>
 
       <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput
-          placeholder="Search transactions, accounts, goals..."
-          value={query}
-          onValueChange={setQuery}
-        />
+        <CommandInput placeholder="Search transactions, accounts, goals..." value={query} onValueChange={setQuery} />
         <CommandList>
-          {query.length > 0 && query.length < 2 && (
-            <CommandEmpty>Type at least 2 characters to search.</CommandEmpty>
-          )}
-          {query.length >= 2 && !loading && results.length === 0 && (
-            <CommandEmpty>No results found.</CommandEmpty>
-          )}
-          {loading && query.length >= 2 && (
-            <div className="py-6 text-center text-sm text-muted-foreground">Searching...</div>
-          )}
+          {query.length > 0 && query.length < 2 && <CommandEmpty>Type at least 2 characters to search.</CommandEmpty>}
+          {query.length >= 2 && !loading && results.length === 0 && <CommandEmpty>No results found.</CommandEmpty>}
+          {loading && query.length >= 2 && <div className="py-6 text-center text-sm text-muted-foreground">Searching...</div>}
           {groupOrder.map((groupName) => {
             const items = grouped[groupName];
             if (!items || items.length === 0) return null;
@@ -204,11 +175,7 @@ export function GlobalSearch() {
                 {items.map((result) => {
                   const Icon = getIcon(result);
                   return (
-                    <CommandItem
-                      key={result.id}
-                      value={result.id}
-                      onSelect={() => handleSelect(result)}
-                    >
+                    <CommandItem key={result.id} value={result.id} onSelect={() => handleSelect(result)}>
                       <span
                         className="flex items-center justify-center w-6 h-6 rounded-md shrink-0"
                         style={{
@@ -220,9 +187,7 @@ export function GlobalSearch() {
                       </span>
                       <div className="flex flex-col min-w-0">
                         <span className="truncate">{result.title}</span>
-                        {result.subtitle && (
-                          <span className="text-xs text-muted-foreground truncate">{result.subtitle}</span>
-                        )}
+                        {result.subtitle && <span className="text-xs text-muted-foreground truncate">{result.subtitle}</span>}
                       </div>
                     </CommandItem>
                   );

@@ -100,9 +100,19 @@ export async function getMonthlyProgress(): Promise<MonthlyProgress> {
   const totalCollectionValue = cardItems.reduce((s, item) => {
     const qty = decryptAmount(item.quantity, encKey);
     const unit =
-      item.finish === "FOIL" ? (item.catalog.priceUsdFoil ? parseFloat(item.catalog.priceUsdFoil) : 0) :
-      item.finish === "ENCHANTED" ? (item.catalog.priceUsdFoil ? parseFloat(item.catalog.priceUsdFoil) : (item.catalog.priceUsd ? parseFloat(item.catalog.priceUsd) : 0)) :
-      (item.catalog.priceUsd ? parseFloat(item.catalog.priceUsd) : 0);
+      item.finish === "FOIL"
+        ? item.catalog.priceUsdFoil
+          ? parseFloat(item.catalog.priceUsdFoil)
+          : 0
+        : item.finish === "ENCHANTED"
+          ? item.catalog.priceUsdFoil
+            ? parseFloat(item.catalog.priceUsdFoil)
+            : item.catalog.priceUsd
+              ? parseFloat(item.catalog.priceUsd)
+              : 0
+          : item.catalog.priceUsd
+            ? parseFloat(item.catalog.priceUsd)
+            : 0;
     return s + convertCurrency(qty * unit, "USD", userCurrency, rates);
   }, 0);
 
