@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { usePartnerView } from "@/hooks/use-partner-view";
 import { convertCurrency } from "@/lib/exchange-rates";
 import { currencyFormatter } from "@/lib/format";
+import { SUPPORTED_CURRENCIES } from "@/lib/constants";
 import { getExchangeRates as fetchExchangeRates } from "@/actions/exchange-rates";
 import {
   isCatalogEmpty,
@@ -84,6 +85,7 @@ export function CardsClient() {
   const [formCondition, setFormCondition] = useState<Condition>("NM");
   const [formQuantity, setFormQuantity] = useState("1");
   const [formAcquired, setFormAcquired] = useState("");
+  const [formAcquiredCurrency, setFormAcquiredCurrency] = useState<string>("USD");
   const [formAcquiredDate, setFormAcquiredDate] = useState("");
   const [formNotes, setFormNotes] = useState("");
 
@@ -153,7 +155,7 @@ export function CardsClient() {
   const usdToUser = (usd: number) => convertCurrency(usd, "USD", userCurrency, rates);
 
   const collectionTotalUsd = useMemo(() => collection.reduce((sum, c) => sum + (c.totalMarketUsd ?? 0), 0), [collection]);
-  const collectionCostUsd = useMemo(() => collection.reduce((sum, c) => sum + c.acquiredPrice * c.quantity, 0), [collection]);
+  const collectionCostUsd = useMemo(() => collection.reduce((sum, c) => sum + (c.totalAcquiredCostUsd ?? c.acquiredPrice * c.quantity), 0), [collection]);
   const totalQuantity = useMemo(() => collection.reduce((s, c) => s + c.quantity, 0), [collection]);
   const collectionGain = collectionTotalUsd - collectionCostUsd;
   const collectionGainPct = collectionCostUsd > 0 ? (collectionGain / collectionCostUsd) * 100 : 0;
@@ -192,6 +194,7 @@ export function CardsClient() {
     setFormCondition("NM");
     setFormQuantity("1");
     setFormAcquired(card.priceUsd ? card.priceUsd.toFixed(2) : "0");
+    setFormAcquiredCurrency("USD");
     setFormAcquiredDate(new Date().toISOString().slice(0, 10));
     setFormNotes("");
     setAddDialogOpen(true);
@@ -204,6 +207,7 @@ export function CardsClient() {
     setFormCondition(item.condition);
     setFormQuantity(String(item.quantity));
     setFormAcquired(item.acquiredPrice.toFixed(2));
+    setFormAcquiredCurrency(item.currency || "USD");
     setFormAcquiredDate(item.acquiredDate ? item.acquiredDate.slice(0, 10) : "");
     setFormNotes(item.notes ?? "");
     setAddDialogOpen(true);
@@ -230,7 +234,7 @@ export function CardsClient() {
         language: "EN",
         quantity: qty,
         acquiredPrice: price,
-        currency: "USD",
+        currency: formAcquiredCurrency || "USD",
         acquiredDate: formAcquiredDate || null,
         notes: formNotes || null,
       };
@@ -726,8 +730,19 @@ export function CardsClient() {
                   <Input type="number" min="1" step="1" value={formQuantity} onChange={(e) => setFormQuantity(e.target.value)} required />
                 </div>
                 <div className="space-y-1">
-                  <Label>Acquired price (USD/ea)</Label>
+                  <Label>Acquired price (per unit)</Label>
                   <Input type="number" min="0" step="0.01" value={formAcquired} onChange={(e) => setFormAcquired(e.target.value)} required />
+                </div>
+                <div className="space-y-1">
+                  <Label>Currency</Label>
+                  <Select value={formAcquiredCurrency} onValueChange={(v) => setFormAcquiredCurrency(v ?? "USD")}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {SUPPORTED_CURRENCIES.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1 col-span-2">
                   <Label>Acquired date</Label>

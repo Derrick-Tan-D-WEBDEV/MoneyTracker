@@ -9,6 +9,7 @@ import { getEncryptionKey, encrypt, decrypt, encryptAmount, decryptAmount } from
 import { CardGame, CardFinish, CardCondition } from "@/generated/prisma/enums";
 import { searchCards as lorcastSearchCards, getCardById, parsePrice, fullCardName } from "@/lib/lorcast";
 import { syncLorcanaCatalog, refreshLorcanaPrices } from "@/lib/card-catalog-sync";
+import { getExchangeRates, convertCurrency } from "@/lib/exchange-rates";
 import Papa from "papaparse";
 
 // ─── Schemas ─────────────────────────────────────────────────────────
@@ -205,6 +206,8 @@ export type CollectionItem = {
   // computed
   unitMarketUsd: number | null;
   totalMarketUsd: number | null;
+  /** acquiredPrice * quantity normalized to USD (acquiredPrice may be in any currency). */
+  totalAcquiredCostUsd: number;
   gainLossUsd: number | null;
   createdAt: string;
 };
@@ -219,13 +222,18 @@ export async function getCollection(): Promise<CollectionItem[]> {
     orderBy: { createdAt: "desc" },
   });
 
+  // Use USD as the convert hub since catalog prices are USD.
+  const rates = await getExchangeRates("USD");
+
   return rows.map((r) => {
     const catalog = toCatalogCard(r.catalog);
     const quantity = decryptAmount(r.quantity, encKey);
     const acquiredPrice = decryptAmount(r.acquiredPrice, encKey);
+    const acquiredPriceUsd = convertCurrency(acquiredPrice, r.currency || "USD", "USD", rates);
+    const totalAcquiredCostUsd = acquiredPriceUsd * quantity;
     const unitMarketUsd = r.finish === CardFinish.FOIL ? catalog.priceUsdFoil : r.finish === CardFinish.ENCHANTED ? (catalog.priceUsdFoil ?? catalog.priceUsd) : catalog.priceUsd;
     const totalMarketUsd = unitMarketUsd != null ? unitMarketUsd * quantity : null;
-    const gainLossUsd = totalMarketUsd != null ? totalMarketUsd - acquiredPrice * quantity : null;
+    const gainLossUsd = totalMarketUsd != null ? totalMarketUsd - totalAcquiredCostUsd : null;
     return {
       id: r.id,
       catalog,
@@ -239,6 +247,7 @@ export async function getCollection(): Promise<CollectionItem[]> {
       notes: r.notes ? decrypt(r.notes, encKey) : null,
       unitMarketUsd,
       totalMarketUsd,
+      totalAcquiredCostUsd,
       gainLossUsd,
       createdAt: r.createdAt.toISOString(),
     };

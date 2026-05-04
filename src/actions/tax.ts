@@ -30,6 +30,8 @@ export async function getTaxPredictionData(): Promise<TaxPredictionData> {
     where: {
       userId: session.user.id,
       type: "INCOME",
+      isRecurring: false,
+      isAdjustment: false,
       date: { gte: startOfYear, lte: now },
     },
     include: { account: true, category: true },

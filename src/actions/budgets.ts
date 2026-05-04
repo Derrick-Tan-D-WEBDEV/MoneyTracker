@@ -44,6 +44,8 @@ export async function getBudgets() {
           userId,
           categoryId: budget.categoryId,
           type: "EXPENSE",
+          isRecurring: false,
+          isAdjustment: false,
           date: { gte: startOfMonth, lte: now },
         },
         include: { account: true },
