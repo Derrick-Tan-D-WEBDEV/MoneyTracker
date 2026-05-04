@@ -81,7 +81,19 @@ export function CardsClient() {
 
   // Browse filter state (client-side over loaded results)
   const ALL_SETS = "__all__";
-  const RARITY_OPTIONS = ["common", "uncommon", "rare", "super_rare", "legendary", "enchanted", "iconic", "epic", "promo"] as const;
+  // Lorcast stores rarity as a proper-cased string (e.g. "Common", "Uncommon", "Super_rare").
+  // Keep the canonical value as the chip's value and a friendly label for display.
+  const RARITY_OPTIONS: { value: string; label: string }[] = [
+    { value: "Common", label: "Common" },
+    { value: "Uncommon", label: "Uncommon" },
+    { value: "Rare", label: "Rare" },
+    { value: "Super_rare", label: "Super Rare" },
+    { value: "Legendary", label: "Legendary" },
+    { value: "Enchanted", label: "Enchanted" },
+    { value: "Iconic", label: "Iconic" },
+    { value: "Epic", label: "Epic" },
+    { value: "Promo", label: "Promo" },
+  ];
   const [filterRarities, setFilterRarities] = useState<string[]>([]);
   const [filterMinPrice, setFilterMinPrice] = useState<string>("");
   const [filterMaxPrice, setFilterMaxPrice] = useState<string>("");
@@ -609,17 +621,15 @@ export function CardsClient() {
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {RARITY_OPTIONS.map((r) => {
-                      const active = filterRarities.includes(r);
+                      const active = filterRarities.includes(r.value);
                       return (
                         <button
-                          key={r}
+                          key={r.value}
                           type="button"
-                          onClick={() => toggleRarity(r)}
-                          className={`text-xs px-2 py-1 rounded-md border capitalize transition-colors ${
-                            active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"
-                          }`}
+                          onClick={() => toggleRarity(r.value)}
+                          className={`text-xs px-2 py-1 rounded-md border transition-colors ${active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}
                         >
-                          {r.replace("_", " ")}
+                          {r.label}
                         </button>
                       );
                     })}

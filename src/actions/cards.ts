@@ -157,7 +157,19 @@ export async function browseCatalog(opts: { query?: string; setCode?: string; ra
   const where: Record<string, unknown> = { game: CardGame.LORCANA };
   if (trimmed.length >= 2) where.name = { contains: trimmed, mode: "insensitive" };
   if (opts.setCode) where.setCode = opts.setCode;
-  if (opts.rarities && opts.rarities.length > 0) where.rarity = { in: opts.rarities };
+  if (opts.rarities && opts.rarities.length > 0) {
+    // Lorcast stores rarity proper-cased ("Common", "Super_rare", …). Match case-insensitively
+    // by expanding to common variants so this works regardless of how the catalog row is stored.
+    const variants = new Set<string>();
+    for (const r of opts.rarities) {
+      variants.add(r);
+      variants.add(r.toLowerCase());
+      variants.add(r.toUpperCase());
+      // Capitalize first letter
+      variants.add(r.charAt(0).toUpperCase() + r.slice(1).toLowerCase());
+    }
+    where.rarity = { in: [...variants] };
+  }
   if (opts.hasPriceOnly) {
     where.OR = [{ priceUsd: { not: null } }, { priceUsdFoil: { not: null } }];
   }
