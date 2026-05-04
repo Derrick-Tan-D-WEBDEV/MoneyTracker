@@ -10,7 +10,7 @@
  */
 
 import { db } from "@/lib/db";
-import { CardGame, CardFinish } from "@/generated/prisma";
+import { CardGame, CardFinish } from "@/generated/prisma/enums";
 import { getAllSets, getCardsBySetCode, getCardById, parsePrice, type LorcastCard } from "@/lib/lorcast";
 
 interface SyncResult {

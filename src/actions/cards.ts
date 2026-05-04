@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getViewUserId } from "@/lib/partner-view";
 import { getEncryptionKey, encrypt, decrypt, encryptAmount, decryptAmount } from "@/lib/encryption";
-import { CardGame, CardFinish, CardCondition } from "@/generated/prisma";
+import { CardGame, CardFinish, CardCondition } from "@/generated/prisma/enums";
 import { searchCards as lorcastSearchCards, getCardById, parsePrice, fullCardName } from "@/lib/lorcast";
 import { syncLorcanaCatalog, refreshLorcanaPrices } from "@/lib/card-catalog-sync";
 import Papa from "papaparse";
