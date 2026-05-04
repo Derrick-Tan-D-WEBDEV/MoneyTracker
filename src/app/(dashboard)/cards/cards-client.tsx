@@ -384,7 +384,7 @@ export function CardsClient() {
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Collection value</p>
-            <p className="text-2xl font-bold">{formatCurrency.format(usdToUser(collectionTotalUsd))}</p>
+            <p className="text-2xl font-bold">{formatCurrency(usdToUser(collectionTotalUsd))}</p>
             <p className="text-xs text-muted-foreground mt-1">
               {totalQuantity} cards · {collection.length} unique
             </p>
@@ -393,7 +393,7 @@ export function CardsClient() {
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Cost basis</p>
-            <p className="text-2xl font-bold">{formatCurrency.format(usdToUser(collectionCostUsd))}</p>
+            <p className="text-2xl font-bold">{formatCurrency(usdToUser(collectionCostUsd))}</p>
           </CardContent>
         </Card>
         <Card>
@@ -401,7 +401,7 @@ export function CardsClient() {
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Unrealized P/L</p>
             <p className={`text-2xl font-bold ${collectionGain >= 0 ? "text-emerald-500" : "text-red-500"}`}>
               {collectionGain >= 0 ? "+" : ""}
-              {formatCurrency.format(usdToUser(collectionGain))}
+              {formatCurrency(usdToUser(collectionGain))}
             </p>
             <p className={`text-xs mt-1 ${collectionGain >= 0 ? "text-emerald-500" : "text-red-500"}`}>
               {collectionGain >= 0 ? "+" : ""}
@@ -463,12 +463,12 @@ export function CardsClient() {
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="font-semibold">{totalUserCurr != null ? formatCurrency.format(totalUserCurr) : "—"}</p>
-                        <p className="text-xs text-muted-foreground">{unitUserCurr != null ? `${formatCurrency.format(unitUserCurr)} ea` : "no price"}</p>
+                        <p className="font-semibold">{totalUserCurr != null ? formatCurrency(totalUserCurr) : "—"}</p>
+                        <p className="text-xs text-muted-foreground">{unitUserCurr != null ? `${formatCurrency(unitUserCurr)} ea` : "no price"}</p>
                         {gain != null && (
                           <p className={`text-xs ${gain >= 0 ? "text-emerald-500" : "text-red-500"}`}>
                             {gain >= 0 ? "+" : ""}
-                            {formatCurrency.format(gain)}
+                            {formatCurrency(gain)}
                           </p>
                         )}
                       </div>
@@ -546,10 +546,10 @@ export function CardsClient() {
                       #{card.cardNumber} · {card.rarity ?? "—"}
                     </p>
                     <div className="flex justify-between items-center text-xs">
-                      <span className="font-semibold">{card.priceUsd != null ? formatCurrency.format(usdToUser(card.priceUsd)) : "—"}</span>
+                      <span className="font-semibold">{card.priceUsd != null ? formatCurrency(usdToUser(card.priceUsd)) : "—"}</span>
                       {card.priceUsdFoil != null && (
                         <span className="text-amber-500" title="Foil">
-                          {formatCurrency.format(usdToUser(card.priceUsdFoil))}★
+                          {formatCurrency(usdToUser(card.priceUsdFoil))}★
                         </span>
                       )}
                     </div>
@@ -601,8 +601,8 @@ export function CardsClient() {
                       </div>
                     </div>
                     <div className="text-right text-sm">
-                      <p>Now: {currentUsd != null ? formatCurrency.format(usdToUser(currentUsd)) : "—"}</p>
-                      {w.targetMaxPrice != null && <p className="text-xs text-muted-foreground">Target ≤ {formatCurrency.format(usdToUser(w.targetMaxPrice))}</p>}
+                      <p>Now: {currentUsd != null ? formatCurrency(usdToUser(currentUsd)) : "—"}</p>
+                      {w.targetMaxPrice != null && <p className="text-xs text-muted-foreground">Target ≤ {formatCurrency(usdToUser(w.targetMaxPrice))}</p>}
                     </div>
                     {!isPartnerView && (
                       <Button variant="ghost" size="icon" onClick={() => handleRemoveWishlist(w.id)} aria-label="Remove">
