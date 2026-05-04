@@ -714,6 +714,15 @@ export function DashboardClient({ data }: { data: DashboardData | null }) {
                   </p>
                 </div>
               )}
+              {monthlyProgress.totalCollectionCount > 0 && (
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">Card Collection</p>
+                  <p className="text-lg font-bold text-purple-500">{formatCurrency(monthlyProgress.totalCollectionValue)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {monthlyProgress.totalCollectionCount} card{monthlyProgress.totalCollectionCount !== 1 ? "s" : ""}
+                  </p>
+                </div>
+              )}
             </div>
             {monthlyProgress.upcomingBills.length > 0 && (
               <div className="border-t pt-3">

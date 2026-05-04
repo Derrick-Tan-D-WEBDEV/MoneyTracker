@@ -30,6 +30,10 @@ export interface MonthlyProgress {
   totalAssetValue: number;
   totalAssetCount: number;
 
+  // Card collection
+  totalCollectionValue: number;
+  totalCollectionCount: number;
+
   // Overall
   upcomingBills: { name: string; amount: number; dueDay: number; type: string }[];
   monthLabel: string;
@@ -88,6 +92,20 @@ export async function getMonthlyProgress(): Promise<MonthlyProgress> {
 
   const totalAssetValue = activeAssets.reduce((s, a) => s + convertCurrency(decryptAmount(a.currentValue, encKey), a.currency, userCurrency, rates), 0);
 
+  // Card collection (USD-denominated catalog prices)
+  const cardItems = await db.cardCollectionItem.findMany({
+    where: { userId },
+    include: { catalog: { select: { priceUsd: true, priceUsdFoil: true } } },
+  });
+  const totalCollectionValue = cardItems.reduce((s, item) => {
+    const qty = decryptAmount(item.quantity, encKey);
+    const unit =
+      item.finish === "FOIL" ? (item.catalog.priceUsdFoil ? parseFloat(item.catalog.priceUsdFoil) : 0) :
+      item.finish === "ENCHANTED" ? (item.catalog.priceUsdFoil ? parseFloat(item.catalog.priceUsdFoil) : (item.catalog.priceUsd ? parseFloat(item.catalog.priceUsd) : 0)) :
+      (item.catalog.priceUsd ? parseFloat(item.catalog.priceUsd) : 0);
+    return s + convertCurrency(qty * unit, "USD", userCurrency, rates);
+  }, 0);
+
   // Project monthly interest from goals with interest rates
   const projectedInterestMonthly = goals.reduce((s, g) => {
     const rate = decryptAmount(g.interestRate, encKey);
@@ -140,6 +158,8 @@ export async function getMonthlyProgress(): Promise<MonthlyProgress> {
     projectedInterestMonthly: Math.round(projectedInterestMonthly * 100) / 100,
     totalAssetValue: Math.round(totalAssetValue * 100) / 100,
     totalAssetCount: activeAssets.length,
+    totalCollectionValue: Math.round(totalCollectionValue * 100) / 100,
+    totalCollectionCount: cardItems.length,
     upcomingBills: upcomingBills.slice(0, 5),
     monthLabel,
   };

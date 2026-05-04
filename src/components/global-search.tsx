@@ -38,6 +38,7 @@ import {
   PiggyBank,
   Sparkles,
   Shield,
+  Layers,
   type LucideIcon,
 } from "lucide-react";
 
@@ -54,6 +55,7 @@ const pageIcons: Record<string, LucideIcon> = {
   "calendar-clock": CalendarClock,
   calendar: Calendar,
   package: Package,
+  layers: Layers,
   gift: Gift,
   "bar-chart-3": BarChart3,
   calculator: Calculator,
@@ -74,6 +76,7 @@ const typeLabels: Record<string, string> = {
   subscription: "Subscriptions",
   asset: "Assets",
   wishlist: "Wishlist",
+  card: "Cards",
 };
 
 function getIcon(result: SearchResult) {

@@ -7,7 +7,7 @@ import { getEncryptionKey, decrypt, decryptAmount } from "@/lib/encryption";
 
 export interface SearchResult {
   id: string;
-  type: "transaction" | "account" | "category" | "goal" | "investment" | "debt" | "subscription" | "asset" | "wishlist" | "page";
+  type: "transaction" | "account" | "category" | "goal" | "investment" | "debt" | "subscription" | "asset" | "wishlist" | "card" | "page";
   title: string;
   subtitle?: string;
   href: string;
@@ -38,6 +38,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
     { id: "page-recurring", type: "page", title: "Recurring", href: "/recurring", icon: "calendar-clock" },
     { id: "page-calendar", type: "page", title: "Bill Calendar", href: "/calendar", icon: "calendar" },
     { id: "page-assets", type: "page", title: "Assets", href: "/assets", icon: "package" },
+    { id: "page-cards", type: "page", title: "Cards", href: "/cards", icon: "layers" },
     { id: "page-wishlist", type: "page", title: "Wishlist", href: "/wishlist", icon: "gift" },
     { id: "page-reports", type: "page", title: "Reports", href: "/reports", icon: "bar-chart-3" },
     { id: "page-tax", type: "page", title: "Tax Prediction", href: "/tax", icon: "calculator" },
@@ -225,6 +226,26 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
         color: "#EC4899",
       });
     }
+  }
+
+  // Card collection (search by catalog name)
+  const cards = await db.cardCollectionItem.findMany({
+    where: {
+      userId,
+      catalog: { name: { contains: q, mode: "insensitive" } },
+    },
+    include: { catalog: true },
+    take: 25,
+  });
+  for (const c of cards) {
+    results.push({
+      id: `card-${c.id}`,
+      type: "card",
+      title: c.catalog.subtitle ? `${c.catalog.name} – ${c.catalog.subtitle}` : c.catalog.name,
+      subtitle: `${c.catalog.setName} · #${c.catalog.cardNumber} · ${c.finish}`,
+      href: "/cards",
+      color: "#8B5CF6",
+    });
   }
 
   return results.slice(0, 25);

@@ -27,6 +27,11 @@ export async function takeNetWorthSnapshot() {
     where: { userId, isSold: false },
   });
 
+  const cardItems = await db.cardCollectionItem.findMany({
+    where: { userId },
+    include: { catalog: { select: { priceUsd: true, priceUsdFoil: true } } },
+  });
+
   const accountBalance = accounts.reduce((sum, acc) => {
     const effectiveBalance = decryptAmount(acc.balance, encKey) - decryptAmount(acc.reservedAmount, encKey);
     const converted = convertCurrency(effectiveBalance, acc.currency, userCurrency, rates);
@@ -46,15 +51,25 @@ export async function takeNetWorthSnapshot() {
     return sum + convertCurrency(decryptAmount(a.currentValue, encKey), a.currency, userCurrency, rates);
   }, 0);
 
-  const netWorth = accountBalance + totalAssets - totalDebt;
+  // Card collection — prices live in CardCatalog (USD).
+  const totalCollectibles = cardItems.reduce((sum, item) => {
+    const qty = decryptAmount(item.quantity, encKey);
+    const unit =
+      item.finish === "FOIL" ? (item.catalog.priceUsdFoil ? parseFloat(item.catalog.priceUsdFoil) : 0) :
+      item.finish === "ENCHANTED" ? (item.catalog.priceUsdFoil ? parseFloat(item.catalog.priceUsdFoil) : (item.catalog.priceUsd ? parseFloat(item.catalog.priceUsd) : 0)) :
+      (item.catalog.priceUsd ? parseFloat(item.catalog.priceUsd) : 0);
+    return sum + convertCurrency(qty * unit, "USD", userCurrency, rates);
+  }, 0);
+
+  const netWorth = accountBalance + totalAssets + totalCollectibles - totalDebt;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   await db.netWorthSnapshot.upsert({
     where: { userId_date: { userId, date: today } },
-    update: { netWorth: encryptAmount(netWorth, encKey) },
-    create: { userId, date: today, netWorth: encryptAmount(netWorth, encKey) },
+    update: { netWorth: encryptAmount(netWorth, encKey), collectiblesValue: encryptAmount(totalCollectibles, encKey) },
+    create: { userId, date: today, netWorth: encryptAmount(netWorth, encKey), collectiblesValue: encryptAmount(totalCollectibles, encKey) },
   });
 
   return netWorth;

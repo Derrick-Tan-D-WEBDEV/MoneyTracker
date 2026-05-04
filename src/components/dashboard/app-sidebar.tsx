@@ -23,6 +23,7 @@ import {
   Calculator,
   Heart,
   Package,
+  Layers,
   ChevronRight,
   PiggyBank,
   FileText,
@@ -66,6 +67,7 @@ const navGroups: NavGroup[] = [
     icon: TrendingUp,
     items: [
       { href: "/investments", icon: TrendingUp, label: "Investments" },
+      { href: "/cards", icon: Layers, label: "Cards" },
       { href: "/assets", icon: Package, label: "Assets" },
       { href: "/debts", icon: Landmark, label: "Debts" },
       { href: "/installments", icon: CreditCard, label: "Installments" },

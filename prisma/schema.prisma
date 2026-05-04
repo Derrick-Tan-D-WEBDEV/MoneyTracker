@@ -47,6 +47,8 @@ model User {
   coupleLinksAsPartner CoupleLink[] @relation("CoupleLinkPartner")
   assets            Asset[]
   pushSubscriptions PushSubscription[]
+  cardCollection    CardCollectionItem[]
+  cardWishlist      CardWishlistItem[]
 }
 
 model Account {
@@ -405,6 +407,7 @@ model NetWorthSnapshot {
   userId   String   @db.Uuid
   date     DateTime @db.Date
   netWorth String
+  collectiblesValue String? // optional encrypted breakdown for card collection value
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -530,3 +533,110 @@ model PushSubscription {
 
   @@index([userId])
 }
+
+// ─── Card Collection (TCG: Lorcana, MTG, etc.) ─────────────────────
+
+enum CardGame {
+  LORCANA
+}
+
+enum CardFinish {
+  NORMAL
+  FOIL
+  ENCHANTED
+}
+
+enum CardCondition {
+  NM
+  LP
+  MP
+  HP
+  DMG
+}
+
+/// Public catalog of cards — shared across all users. Plaintext.
+model CardCatalog {
+  id           String     @id @default(uuid()) @db.Uuid
+  game         CardGame
+  externalId   String     @unique // e.g. Lorcast card id
+  setCode      String
+  setName      String
+  cardNumber   String
+  name         String
+  subtitle     String? // e.g. "King of Thieves" version subtitle
+  rarity       String? // common | uncommon | rare | super_rare | legendary | enchanted | promo
+  inkCost      Int?
+  cardType     String? // e.g. "Character", "Action"
+  ink          String? // Lorcana ink color (Amber, Amethyst, …)
+  imageSmall   String?
+  imageNormal  String?
+  priceUsd     String? // current TCGPlayer market price (normal finish)
+  priceUsdFoil String? // current TCGPlayer market price (foil)
+  lastPricedAt DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  collectionItems CardCollectionItem[]
+  priceSnapshots  CardPriceSnapshot[]
+  wishlistItems   CardWishlistItem[]
+
+  @@index([game, setCode])
+  @@index([game, name])
+}
+
+/// Per-user owned card. quantity / acquiredPrice / notes are encrypted.
+model CardCollectionItem {
+  id            String         @id @default(uuid()) @db.Uuid
+  userId        String         @db.Uuid
+  catalogId     String         @db.Uuid
+  finish        CardFinish     @default(NORMAL)
+  condition     CardCondition  @default(NM)
+  language      String         @default("EN")
+  quantity      String         // ENCRYPTED amount (integer-valued)
+  acquiredPrice String         // ENCRYPTED amount (per-unit cost basis)
+  currency      String         @default("USD")
+  acquiredDate  DateTime?
+  notes         String?        // ENCRYPTED
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  catalog CardCatalog @relation(fields: [catalogId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([userId, catalogId])
+  @@index([catalogId])
+}
+
+/// Daily price history. Plaintext (public price data).
+model CardPriceSnapshot {
+  id         String     @id @default(uuid()) @db.Uuid
+  catalogId  String     @db.Uuid
+  finish     CardFinish @default(NORMAL)
+  priceUsd   String // numeric stored as string for consistency
+  recordedOn DateTime   @db.Date
+  createdAt  DateTime   @default(now())
+
+  catalog CardCatalog @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+
+  @@unique([catalogId, finish, recordedOn])
+  @@index([catalogId, recordedOn])
+}
+
+/// Per-user wishlist of cards (separate from generic WishlistItem).
+model CardWishlistItem {
+  id              String     @id @default(uuid()) @db.Uuid
+  userId          String     @db.Uuid
+  catalogId       String     @db.Uuid
+  finish          CardFinish @default(NORMAL)
+  targetMaxPrice  String?    // ENCRYPTED (USD)
+  notes           String?    // ENCRYPTED
+  createdAt       DateTime   @default(now())
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  catalog CardCatalog @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, catalogId, finish])
+  @@index([userId])
+}
+

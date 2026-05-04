@@ -265,7 +265,13 @@ export async function reEncryptUserData(userId: string, oldKey: string, newKey: 
   await reEncryptTable(tags, ["name"], (id, data) => db.tag.update({ where: { id }, data }));
 
   const netWorthSnapshots = await db.netWorthSnapshot.findMany({ where: { userId } });
-  await reEncryptTable(netWorthSnapshots, ["netWorth"], (id, data) => db.netWorthSnapshot.update({ where: { id }, data }));
+  await reEncryptTable(netWorthSnapshots, ["netWorth", "collectiblesValue"], (id, data) => db.netWorthSnapshot.update({ where: { id }, data }));
+
+  const cardItems = await db.cardCollectionItem.findMany({ where: { userId } });
+  await reEncryptTable(cardItems, ["quantity", "acquiredPrice", "notes"], (id, data) => db.cardCollectionItem.update({ where: { id }, data }));
+
+  const cardWishlist = await db.cardWishlistItem.findMany({ where: { userId } });
+  await reEncryptTable(cardWishlist, ["targetMaxPrice", "notes"], (id, data) => db.cardWishlistItem.update({ where: { id }, data }));
 }
 
 /**
@@ -323,7 +329,13 @@ export async function encryptExistingData(userId: string, key: string) {
   await encryptTable(tags, ["name"], (id, data) => db.tag.update({ where: { id }, data }));
 
   const netWorthSnapshots = await db.netWorthSnapshot.findMany({ where: { userId } });
-  await encryptTable(netWorthSnapshots, ["netWorth"], (id, data) => db.netWorthSnapshot.update({ where: { id }, data }));
+  await encryptTable(netWorthSnapshots, ["netWorth", "collectiblesValue"], (id, data) => db.netWorthSnapshot.update({ where: { id }, data }));
+
+  const cardItems = await db.cardCollectionItem.findMany({ where: { userId } });
+  await encryptTable(cardItems, ["quantity", "acquiredPrice", "notes"], (id, data) => db.cardCollectionItem.update({ where: { id }, data }));
+
+  const cardWishlist = await db.cardWishlistItem.findMany({ where: { userId } });
+  await encryptTable(cardWishlist, ["targetMaxPrice", "notes"], (id, data) => db.cardWishlistItem.update({ where: { id }, data }));
 
   // Mark user as encrypted
   await db.user.update({
