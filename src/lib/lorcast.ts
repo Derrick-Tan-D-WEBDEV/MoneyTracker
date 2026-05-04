@@ -68,16 +68,16 @@ interface CacheEntry<T> {
 }
 const cache = new Map<string, CacheEntry<unknown>>();
 
-async function cachedFetch<T>(url: string, ttlMs = CACHE_TTL_MS): Promise<T | null> {
+async function cachedFetch<T>(url: string, ttlMs = CACHE_TTL_MS, opts?: { force?: boolean }): Promise<T | null> {
   const cached = cache.get(url) as CacheEntry<T> | undefined;
-  if (cached && Date.now() - cached.fetchedAt < ttlMs) return cached.data;
+  if (!opts?.force && cached && Date.now() - cached.fetchedAt < ttlMs) return cached.data;
 
   await throttle();
   try {
     const res = await fetch(url, {
       headers: { Accept: "application/json" },
-      // Next.js data-cache layer in addition to our in-memory cache
-      next: { revalidate: 60 * 60 * 24 },
+      // Bypass Next.js data cache when forcing; otherwise let it ride alongside our in-memory cache.
+      ...(opts?.force ? { cache: "no-store" as const } : { next: { revalidate: 60 * 60 * 24 } }),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as T;
@@ -88,19 +88,24 @@ async function cachedFetch<T>(url: string, ttlMs = CACHE_TTL_MS): Promise<T | nu
   }
 }
 
+/** Clear the in-memory Lorcast cache. Used by manual catalog re-sync to force fresh data. */
+export function clearLorcastCache(): void {
+  cache.clear();
+}
+
 // ─── Public API ──────────────────────────────────────────────────────
 
-export async function getAllSets(): Promise<LorcastSet[]> {
-  const data = await cachedFetch<ListResponse<LorcastSet>>(`${API_BASE}/sets`);
+export async function getAllSets(opts?: { force?: boolean }): Promise<LorcastSet[]> {
+  const data = await cachedFetch<ListResponse<LorcastSet>>(`${API_BASE}/sets`, CACHE_TTL_MS, opts);
   return data?.results ?? [];
 }
 
-export async function getCardsBySetCode(code: string): Promise<LorcastCard[]> {
+export async function getCardsBySetCode(code: string, opts?: { force?: boolean }): Promise<LorcastCard[]> {
   // Lorcast's /sets/:code/cards endpoint returns a PLAIN ARRAY of cards
   // (not the wrapped {results, has_more, next_page} shape). Some legacy
   // deployments may still return the wrapped form, so we accept both.
   const url = `${API_BASE}/sets/${encodeURIComponent(code)}/cards`;
-  const data = await cachedFetch<LorcastCard[] | ListResponse<LorcastCard>>(url);
+  const data = await cachedFetch<LorcastCard[] | ListResponse<LorcastCard>>(url, CACHE_TTL_MS, opts);
   if (!data) return [];
   if (Array.isArray(data)) return data;
   return data.results ?? [];

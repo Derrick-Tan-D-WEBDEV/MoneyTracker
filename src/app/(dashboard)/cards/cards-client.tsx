@@ -230,7 +230,9 @@ export function CardsClient() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const res = await syncCatalog();
+      // Manual sync always forces a fresh fetch — the user is here precisely because
+      // they suspect the catalog is missing something (e.g. a newly released promo).
+      const res = await syncCatalog({ force: true });
       toast.success(`Synced ${res.cardsUpserted} cards across ${res.setsProcessed} sets`);
       if (res.errors.length > 0) toast.warning(`${res.errors.length} sync warnings`);
       await refreshAll();
@@ -425,10 +427,16 @@ export function CardsClient() {
         </div>
         <div className="flex gap-2">
           {!isPartnerView && (
-            <Button onClick={handleRefreshPrices} disabled={refreshing || collection.length === 0} variant="outline">
-              <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-              Refresh prices
-            </Button>
+            <>
+              <Button onClick={handleSync} disabled={syncing} variant="outline">
+                <ArrowDownToLine className={`w-4 h-4 mr-2 ${syncing ? "animate-pulse" : ""}`} />
+                {syncing ? "Syncing…" : "Sync catalog"}
+              </Button>
+              <Button onClick={handleRefreshPrices} disabled={refreshing || collection.length === 0} variant="outline">
+                <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+                Refresh prices
+              </Button>
+            </>
           )}
         </div>
       </div>

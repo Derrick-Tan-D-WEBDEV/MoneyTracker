@@ -103,11 +103,13 @@ export async function isCatalogEmpty(game: CardGame = CardGame.LORCANA): Promise
   return count === 0;
 }
 
-/** Trigger a full Lorcana catalog sync. Authenticated users only. */
-export async function syncCatalog() {
+/** Trigger a full Lorcana catalog sync. Authenticated users only.
+ *  When `force` is true, the Lorcast in-memory cache is cleared first so newly added
+ *  sets/cards (e.g. recently released promos) aren't masked by a stale 24h response. */
+export async function syncCatalog(opts?: { force?: boolean }) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
-  const result = await syncLorcanaCatalog();
+  const result = await syncLorcanaCatalog({ force: opts?.force });
   revalidatePath("/cards");
   return result;
 }

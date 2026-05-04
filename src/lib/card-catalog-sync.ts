@@ -11,7 +11,7 @@
 
 import { db } from "@/lib/db";
 import { CardGame, CardFinish } from "@/generated/prisma/enums";
-import { getAllSets, getCardsBySetCode, getCardById, parsePrice, type LorcastCard } from "@/lib/lorcast";
+import { getAllSets, getCardsBySetCode, getCardById, parsePrice, clearLorcastCache, type LorcastCard } from "@/lib/lorcast";
 
 interface SyncResult {
   setsProcessed: number;
@@ -78,10 +78,14 @@ async function recordPriceSnapshots(catalogId: string, priceUsd: string | null, 
  * Full catalog sync — fetches all Lorcana sets and upserts every card.
  * Use on first install or when new sets release.
  */
-export async function syncLorcanaCatalog(): Promise<SyncResult> {
+export async function syncLorcanaCatalog(opts?: { force?: boolean }): Promise<SyncResult> {
   const result: SyncResult = { setsProcessed: 0, cardsUpserted: 0, pricesRecorded: 0, errors: [] };
 
-  const sets = await getAllSets();
+  // When forcing a fresh sync, drop the in-memory Lorcast cache so newly added sets/cards
+  // (e.g. recently released promos) aren't masked by a stale 24h-cached response.
+  if (opts?.force) clearLorcastCache();
+
+  const sets = await getAllSets({ force: opts?.force });
   if (sets.length === 0) {
     result.errors.push("Lorcast returned no sets (network or API issue)");
     return result;
@@ -89,7 +93,7 @@ export async function syncLorcanaCatalog(): Promise<SyncResult> {
 
   for (const set of sets) {
     try {
-      const cards = await getCardsBySetCode(set.code);
+      const cards = await getCardsBySetCode(set.code, { force: opts?.force });
       for (const card of cards) {
         const data = mapCardToCatalog(card);
         const upserted = await db.cardCatalog.upsert({
