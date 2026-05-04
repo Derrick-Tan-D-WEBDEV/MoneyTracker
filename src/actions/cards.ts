@@ -145,6 +145,30 @@ export async function listCardsInSet(setCode: string, game: CardGame = CardGame.
   return rows.map(toCatalogCard);
 }
 
+/**
+ * Filtered browse — local DB only, supports any combination of name query, set, rarities, and
+ * price range. Used by the Browse tab so users can filter without first typing a search query.
+ * Note: price is stored encoded as a string but Lorcast values are plain decimals like "0.51",
+ * so lexicographic comparisons are unsafe — we filter price client-side after fetching candidates.
+ */
+export async function browseCatalog(opts: { query?: string; setCode?: string; rarities?: string[]; hasPriceOnly?: boolean; limit?: number }): Promise<CatalogCard[]> {
+  const limit = Math.min(opts.limit ?? 200, 500);
+  const trimmed = (opts.query ?? "").trim();
+  const where: Record<string, unknown> = { game: CardGame.LORCANA };
+  if (trimmed.length >= 2) where.name = { contains: trimmed, mode: "insensitive" };
+  if (opts.setCode) where.setCode = opts.setCode;
+  if (opts.rarities && opts.rarities.length > 0) where.rarity = { in: opts.rarities };
+  if (opts.hasPriceOnly) {
+    where.OR = [{ priceUsd: { not: null } }, { priceUsdFoil: { not: null } }];
+  }
+  const rows = await db.cardCatalog.findMany({
+    where,
+    orderBy: [{ setCode: "asc" }, { cardNumber: "asc" }],
+    take: limit,
+  });
+  return rows.map(toCatalogCard);
+}
+
 /** Catalog search — local DB first, falls back to Lorcast (and upserts results). */
 export async function searchCatalog(query: string, opts?: { setCode?: string; limit?: number }): Promise<CatalogCard[]> {
   const trimmed = query.trim();

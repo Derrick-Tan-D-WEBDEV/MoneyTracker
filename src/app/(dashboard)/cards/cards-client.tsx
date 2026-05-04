@@ -29,6 +29,7 @@ import {
   listSets,
   listCardsInSet,
   searchCatalog,
+  browseCatalog,
   getCollection,
   addCollectionItem,
   updateCollectionItem,
@@ -137,34 +138,54 @@ export function CardsClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load cards when set changes (a specific set only — All-sets stays empty until a search runs)
+  // Load cards based on set / search / filter state.
+  // - Specific set, no search: load full set list (existing behaviour)
+  // - All sets + search: server-side name search across full catalog
+  // - All sets + filters only: server-side filter query (no search needed)
+  // - All sets, nothing set: empty state
   useEffect(() => {
-    if (!selectedSet || selectedSet === ALL_SETS) {
-      if (selectedSet === ALL_SETS && !browseSearch) setBrowseCards([]);
+    const trimmed = browseSearch.trim();
+    const hasSearch = trimmed.length >= 2;
+    const hasFilters = filterRarities.length > 0 || filterHasPriceOnly;
+
+    // Specific set selected: load full set, then client-side filter via filteredBrowseCards
+    if (selectedSet && selectedSet !== ALL_SETS && !hasSearch) {
+      setBrowseLoading(true);
+      listCardsInSet(selectedSet)
+        .then(setBrowseCards)
+        .finally(() => setBrowseLoading(false));
       return;
     }
-    setBrowseLoading(true);
-    listCardsInSet(selectedSet)
-      .then(setBrowseCards)
-      .finally(() => setBrowseLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSet]);
 
-  // Debounced search (works globally when All-sets is selected)
-  useEffect(() => {
-    if (!browseSearch || browseSearch.trim().length < 2) return;
+    // All sets + nothing entered + no filters — stay empty
+    if (selectedSet === ALL_SETS && !hasSearch && !hasFilters) {
+      setBrowseCards([]);
+      return;
+    }
+
+    // Debounced server query (search and/or filters)
     const t = setTimeout(async () => {
       setBrowseLoading(true);
       try {
         const setCode = selectedSet && selectedSet !== ALL_SETS ? selectedSet : undefined;
-        const res = await searchCatalog(browseSearch, { setCode, limit: 200 });
-        setBrowseCards(res);
+        if (hasSearch) {
+          const res = await searchCatalog(trimmed, { setCode, limit: 200 });
+          setBrowseCards(res);
+        } else {
+          const res = await browseCatalog({
+            setCode,
+            rarities: filterRarities,
+            hasPriceOnly: filterHasPriceOnly,
+            limit: 300,
+          });
+          setBrowseCards(res);
+        }
       } finally {
         setBrowseLoading(false);
       }
-    }, 350);
+    }, 300);
     return () => clearTimeout(t);
-  }, [browseSearch, selectedSet]);
+  }, [browseSearch, selectedSet, filterRarities, filterHasPriceOnly]);
 
   const usdToUser = (usd: number) => convertCurrency(usd, "USD", userCurrency, rates);
 
@@ -642,7 +663,7 @@ export function CardsClient() {
             <p className="text-muted-foreground text-center py-8">
               {browseCards.length === 0
                 ? selectedSet === ALL_SETS
-                  ? "Type at least 2 characters in the search box to find cards across all sets."
+                  ? "Search across all sets, or open Filters to browse by rarity / price."
                   : `No cards. ${catalogEmpty ? "Sync the catalog above first." : ""}`
                 : "No cards match the current filters."}
             </p>
